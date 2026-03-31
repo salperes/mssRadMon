@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Gösterge Paneli — mssRadMon{% endblock %}
+{% block head %}
+<script src="/static/lib/chart.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="alarm-banner" id="alarmBanner">
+    <strong id="alarmLevel"></strong>: <span id="alarmMsg"></span>
+</div>
+
+<div class="dashboard-grid">
+    <div class="card">
+        <div class="card-title">Anlık Doz Hızı</div>
+        <div>
+            <span class="dose-rate-value status-normal" id="doseRate">—</span>
+            <span class="dose-rate-unit">µSv/h</span>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-title">Günlük Kümülatif Doz</div>
+        <div>
+            <span class="daily-dose-value" id="dailyDose">—</span>
+            <span class="dose-rate-unit">µSv</span>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-title">
+        Son 1 Saat — Doz Hızı
+        <span class="conn-indicator" style="float:right">
+            <span class="conn-dot" id="connDot"></span>
+            <span id="connText">Bağlantı yok</span>
+        </span>
+    </div>
+    <div class="chart-container">
+        <canvas id="doseChart"></canvas>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/dashboard.js"></script>
+{% endblock %}

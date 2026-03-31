@@ -43,7 +43,10 @@ class AlarmManager:
         for name, key in pin_keys.items():
             pin = await self._config.get(key)
             if pin:
-                self._gpio_devices[name] = OutputDevice(int(pin), initial_value=False)
+                try:
+                    self._gpio_devices[name] = OutputDevice(int(pin), initial_value=False)
+                except Exception as e:
+                    logger.warning("GPIO %s (pin %s) başlatılamadı: %s", name, pin, e)
 
     async def check(self, dose_rate: float) -> AlarmLevel | None:
         """Doz hizini kontrol et. Alarm tetiklenirse seviyeyi dondur."""

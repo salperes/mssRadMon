@@ -23,18 +23,23 @@ def test_reading_dataclass():
 
 # --- parse_online_data ---
 
-def test_parse_online_data_valid(reader):
-    """Geçerli dose rate değeri parse edilmeli."""
-    assert reader.parse_online_data(b"0.12\r\n") == 0.12
+def test_parse_online_data_device_format(reader):
+    """Gerçek cihaz formatı: '0,166 uSv/h' parse edilmeli."""
+    assert reader.parse_online_data(b"0,166 uSv/h\r\n") == 0.166
+
+
+def test_parse_online_data_dot_format(reader):
+    """Noktalı format da desteklenmeli."""
+    assert reader.parse_online_data(b"0.12 uSv/h\r\n") == 0.12
 
 
 def test_parse_online_data_integer(reader):
-    assert reader.parse_online_data(b"3\r\n") == 3.0
+    assert reader.parse_online_data(b"3 uSv/h\r\n") == 3.0
 
 
 def test_parse_online_data_multiline(reader):
     """Birden fazla satırda son geçerli değer alınmalı."""
-    raw = b"Online x\r\n0.08\r\n0.12\r\n"
+    raw = b"Online x\r\n0,08 uSv/h\r\n0,12 uSv/h\r\n"
     assert reader.parse_online_data(raw) == 0.12
 
 
@@ -51,8 +56,8 @@ def test_parse_online_data_garbage(reader):
 
 
 def test_parse_online_data_only_text(reader):
-    """Sadece metin satırları varsa None dönmeli."""
-    assert reader.parse_online_data(b"Online 3\r\n") is None
+    """Sadece non-numeric metin satırları varsa None dönmeli."""
+    assert reader.parse_online_data(b"Standard\r\n") is None
 
 
 # --- _parse_version ---
@@ -109,8 +114,7 @@ def test_disconnect(reader):
 def test_read_once_returns_dose_rate(reader):
     mock_ser = MagicMock()
     mock_ser.is_open = True
-    mock_ser.in_waiting = 6
-    mock_ser.read.return_value = b"0.15\r\n"
+    mock_ser.readline.return_value = b"0,150 uSv/h\r\n"
     reader._serial = mock_ser
 
     result = reader.read_once()
@@ -125,8 +129,7 @@ def test_read_once_serial_error(reader):
     import serial as pyserial
     mock_ser = MagicMock()
     mock_ser.is_open = True
-    mock_ser.in_waiting = 5
-    mock_ser.read.side_effect = pyserial.SerialException("hata")
+    mock_ser.readline.side_effect = pyserial.SerialException("hata")
     reader._serial = mock_ser
     reader._connected = True
 

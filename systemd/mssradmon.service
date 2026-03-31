@@ -1,0 +1,16 @@
+[Unit]
+Description=mssRadMon - GammaScout Radyasyon Monitörü
+After=network.target
+
+[Service]
+Type=simple
+User=alper
+WorkingDirectory=/home/alper/mssRadMon
+ExecStart=/home/alper/mssRadMon/.venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8080
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

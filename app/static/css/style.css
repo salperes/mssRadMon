@@ -1,0 +1,160 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+    --bg: #1a1a2e;
+    --surface: #16213e;
+    --card: #0f3460;
+    --text: #e0e0e0;
+    --text-dim: #a0a0a0;
+    --green: #00c853;
+    --yellow: #ffd600;
+    --red: #ff1744;
+    --accent: #00bcd4;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+}
+
+/* Navbar */
+.navbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1.5rem;
+    background: var(--surface);
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+.nav-brand { font-size: 1.25rem; font-weight: 700; color: var(--accent); }
+.nav-links a {
+    color: var(--text-dim);
+    text-decoration: none;
+    margin-left: 1.5rem;
+    font-size: 0.9rem;
+}
+.nav-links a.active { color: var(--accent); }
+
+/* Container */
+.container { max-width: 960px; margin: 0 auto; padding: 1.5rem; }
+
+/* Cards */
+.card {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+}
+.card-title { font-size: 0.85rem; color: var(--text-dim); margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em; }
+
+/* Dashboard grid */
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+@media (max-width: 600px) {
+    .dashboard-grid { grid-template-columns: 1fr; }
+}
+
+/* Dose rate display */
+.dose-rate-value {
+    font-size: 3.5rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+}
+.dose-rate-unit { font-size: 1rem; color: var(--text-dim); margin-left: 0.25rem; }
+
+/* Status colors */
+.status-normal { color: var(--green); }
+.status-high { color: var(--yellow); }
+.status-high-high { color: var(--red); }
+
+/* Connection indicator */
+.conn-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+}
+.conn-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--red);
+}
+.conn-dot.connected { background: var(--green); }
+
+/* Chart container */
+.chart-container { position: relative; width: 100%; height: 250px; }
+
+/* Daily dose */
+.daily-dose-value { font-size: 2rem; font-weight: 600; }
+
+/* Alarm banner */
+.alarm-banner {
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    display: none;
+}
+.alarm-banner.active { display: block; }
+.alarm-banner.high { background: rgba(255,214,0,0.15); border: 1px solid var(--yellow); color: var(--yellow); }
+.alarm-banner.high_high { background: rgba(255,23,68,0.15); border: 1px solid var(--red); color: var(--red); }
+
+/* Admin form */
+.form-group { margin-bottom: 1rem; }
+.form-group label { display: block; font-size: 0.85rem; color: var(--text-dim); margin-bottom: 0.35rem; }
+.form-group input, .form-group select {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    background: var(--surface);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 0.9rem;
+}
+.form-group input:focus, .form-group select:focus { outline: none; border-color: var(--accent); }
+
+.btn {
+    display: inline-block;
+    padding: 0.5rem 1.25rem;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    color: #fff;
+    background: var(--accent);
+}
+.btn:hover { opacity: 0.9; }
+
+/* Alarm history table */
+.alarm-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.alarm-table th, .alarm-table td { padding: 0.5rem; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.08); }
+.alarm-table th { color: var(--text-dim); font-weight: 500; }
+
+/* Toggle switch */
+.toggle { position: relative; display: inline-block; width: 44px; height: 24px; }
+.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle .slider {
+    position: absolute; inset: 0;
+    background: rgba(255,255,255,0.15);
+    border-radius: 24px;
+    cursor: pointer;
+    transition: 0.2s;
+}
+.toggle .slider::before {
+    content: "";
+    position: absolute;
+    width: 18px; height: 18px;
+    left: 3px; bottom: 3px;
+    background: #fff;
+    border-radius: 50%;
+    transition: 0.2s;
+}
+.toggle input:checked + .slider { background: var(--accent); }
+.toggle input:checked + .slider::before { transform: translateX(20px); }

@@ -149,9 +149,10 @@ class GammaScoutReader:
     def parse_online_data(self, raw: bytes) -> float | None:
         """Online mod çıktısını parse edip dose rate (µSv/h) döndür.
 
-        GammaScout dose rate online modu CPS (counts per second) veya
-        doğrudan µSv/h değeri verir. Gerçek format cihaz testinde doğrulanır.
-        Beklenen: satır bazlı ASCII sayısal değer.
+        Gerçek cihaz formatı: "0,166 uSv/h\r\n"
+        - Virgüllü ondalık ayırıcı (Alman formatı)
+        - Birim stringi sonunda
+        - Birden fazla satır gelebilir
         """
         if not raw:
             return None
@@ -159,15 +160,18 @@ class GammaScoutReader:
             text = raw.decode("ascii", errors="ignore").strip()
             if not text:
                 return None
-            # Birden fazla satır gelebilir, son geçerli değeri al
             for line in reversed(text.splitlines()):
                 line = line.strip()
                 if not line:
                     continue
+                # "0,166 uSv/h" formatı: ilk kelimeyi al, virgülü noktaya çevir
+                parts = line.split()
+                if not parts:
+                    continue
+                number_str = parts[0].replace(",", ".")
                 try:
-                    return float(line)
+                    return float(number_str)
                 except ValueError:
-                    # "Online x" gibi mod bildirimi olabilir
                     continue
             return None
         except Exception as e:
@@ -175,19 +179,17 @@ class GammaScoutReader:
             return None
 
     def read_once(self) -> float | None:
-        """Serial porttan mevcut veriyi oku ve dose rate döndür."""
+        """Serial porttan bir satır oku ve dose rate döndür.
+
+        Serial timeout (2s) kadar bekler. Cihaz periyodik olarak veri
+        gönderiyorsa bu sürede yakalar.
+        """
         if not self._serial or not self._serial.is_open:
             return None
         try:
-            waiting = self._serial.in_waiting
-            if waiting == 0:
-                # Kısa süre bekle
-                import time
-                time.sleep(0.1)
-                waiting = self._serial.in_waiting
-            if waiting == 0:
+            raw = self._serial.readline()
+            if not raw:
                 return None
-            raw = self._serial.read(waiting)
             return self.parse_online_data(raw)
         except serial.SerialException as e:
             logger.error("Okuma hatası: %s", e)

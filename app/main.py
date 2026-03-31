@@ -4,7 +4,8 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -108,6 +109,16 @@ def create_app() -> FastAPI:
     app.include_router(api.router)
     app.include_router(ws.router)
     app.include_router(admin.router)
+
+    templates = Jinja2Templates(directory=TEMPLATE_DIR)
+
+    @app.get("/", response_class=HTMLResponse, include_in_schema=False)
+    async def dashboard_page(request: Request):
+        return templates.TemplateResponse("dashboard.html", {"request": request, "active": "dashboard"})
+
+    @app.get("/admin", response_class=HTMLResponse, include_in_schema=False)
+    async def admin_page(request: Request):
+        return templates.TemplateResponse("admin.html", {"request": request, "active": "admin"})
 
     return app
 

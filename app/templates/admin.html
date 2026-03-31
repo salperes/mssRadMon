@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block title %}Yönetim — mssRadMon{% endblock %}
+
+{% block content %}
+<h2 style="margin-bottom: 1rem;">Yönetim Paneli</h2>
+
+<div class="card">
+    <div class="card-title">Örnekleme</div>
+    <div class="form-group">
+        <label for="sampling_interval">Örnekleme Aralığı (saniye)</label>
+        <input type="number" id="sampling_interval" min="1" max="3600">
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-title">Alarm Eşik Değerleri</div>
+    <div class="dashboard-grid">
+        <div class="form-group">
+            <label for="threshold_high">High Eşiği (µSv/h)</label>
+            <input type="number" id="threshold_high" step="0.01" min="0">
+        </div>
+        <div class="form-group">
+            <label for="threshold_high_high">High-High Eşiği (µSv/h)</label>
+            <input type="number" id="threshold_high_high" step="0.01" min="0">
+        </div>
+    </div>
+    <div class="dashboard-grid">
+        <div class="form-group">
+            <label for="alarm_high_actions">High Aksiyonları</label>
+            <input type="text" id="alarm_high_actions" placeholder="buzzer,light">
+        </div>
+        <div class="form-group">
+            <label for="alarm_high_high_actions">High-High Aksiyonları</label>
+            <input type="text" id="alarm_high_high_actions" placeholder="buzzer,light,emergency">
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-title">GPIO Pin Ayarları</div>
+    <div class="dashboard-grid">
+        <div class="form-group">
+            <label for="gpio_buzzer_pin">Buzzer Pin</label>
+            <input type="number" id="gpio_buzzer_pin" min="0" max="40">
+        </div>
+        <div class="form-group">
+            <label for="gpio_light_pin">Işık Pin</label>
+            <input type="number" id="gpio_light_pin" min="0" max="40">
+        </div>
+    </div>
+    <div class="form-group" style="max-width:calc(50% - 0.5rem);">
+        <label for="gpio_emergency_pin">Acil Kapatma Pin</label>
+        <input type="number" id="gpio_emergency_pin" min="0" max="40">
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-title">Buzzer Ayarı</div>
+    <div class="form-group">
+        <label>
+            <span class="toggle">
+                <input type="checkbox" id="alarm_buzzer_enabled">
+                <span class="slider"></span>
+            </span>
+            Buzzer Aktif
+        </label>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-title">E-posta Bildirimi</div>
+    <div class="form-group">
+        <label>
+            <span class="toggle">
+                <input type="checkbox" id="alarm_email_enabled">
+                <span class="slider"></span>
+            </span>
+            E-posta Bildirimi Aktif
+        </label>
+    </div>
+    <div class="form-group">
+        <label for="alarm_email_to">Alıcı Adresi</label>
+        <input type="email" id="alarm_email_to">
+    </div>
+    <div class="dashboard-grid">
+        <div class="form-group">
+            <label for="smtp_host">SMTP Sunucu</label>
+            <input type="text" id="smtp_host">
+        </div>
+        <div class="form-group">
+            <label for="smtp_port">SMTP Port</label>
+            <input type="number" id="smtp_port">
+        </div>
+    </div>
+    <div class="dashboard-grid">
+        <div class="form-group">
+            <label for="smtp_user">SMTP Kullanıcı</label>
+            <input type="text" id="smtp_user">
+        </div>
+        <div class="form-group">
+            <label for="smtp_pass">SMTP Şifre</label>
+            <input type="password" id="smtp_pass">
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-title">Uzak Log Sunucusu</div>
+    <div class="form-group">
+        <label>
+            <span class="toggle">
+                <input type="checkbox" id="remote_log_enabled">
+                <span class="slider"></span>
+            </span>
+            Uzak Log Aktif
+        </label>
+    </div>
+    <div class="form-group">
+        <label for="remote_log_url">Endpoint URL</label>
+        <input type="url" id="remote_log_url">
+    </div>
+    <div class="form-group">
+        <label for="remote_log_api_key">API Anahtarı</label>
+        <input type="text" id="remote_log_api_key">
+    </div>
+</div>
+
+<button class="btn" id="saveBtn" style="margin-bottom: 2rem;">Ayarları Kaydet</button>
+<div id="saveMsg" style="margin-top: 0.5rem; font-size: 0.85rem; color: var(--green); display: none;">Ayarlar kaydedildi.</div>
+
+<div class="card">
+    <div class="card-title">Alarm Geçmişi (Son 24 Saat)</div>
+    <table class="alarm-table">
+        <thead>
+            <tr><th>Zaman</th><th>Seviye</th><th>Doz Hızı</th><th>Aksiyonlar</th></tr>
+        </thead>
+        <tbody id="alarmTableBody">
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/admin.js"></script>
+{% endblock %}
