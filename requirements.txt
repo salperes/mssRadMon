@@ -1,0 +1,7 @@
+fastapi==0.115.*
+uvicorn[standard]==0.34.*
+pyserial==3.5.*
+aiosqlite==0.21.*
+aiohttp==3.11.*
+gpiozero==2.0.*
+jinja2==3.1.*
