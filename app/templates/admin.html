@@ -125,10 +125,55 @@
     </div>
 </div>
 
-<button class="btn" id="saveBtn" style="margin-bottom: 2rem;">Ayarları Kaydet</button>
+<button class="btn" id="saveBtn" style="margin-bottom: 1rem;">Ayarları Kaydet</button>
 <div id="saveMsg" style="margin-top: 0.5rem; font-size: 0.85rem; color: var(--green); display: none;">Ayarlar kaydedildi.</div>
 
-<div class="card">
+<div class="card" style="margin-top: 2rem;">
+    <div class="card-title">WiFi Ayarları</div>
+
+    <div class="wifi-status" id="wifiStatus" style="margin-bottom: 1rem; padding: 0.75rem; background: var(--surface); border-radius: 8px;">
+        <span style="color: var(--text-dim);">Yükleniyor...</span>
+    </div>
+
+    <div class="dashboard-grid" style="margin-bottom: 1rem;">
+        <button class="btn" id="wifiClientBtn" style="width:100%">Client Modu</button>
+        <button class="btn" id="wifiApBtn" style="width:100%; background: var(--yellow); color: #1a1a2e;">AP Modu</button>
+    </div>
+
+    <!-- Client Mode Panel -->
+    <div id="clientPanel" style="display:none;">
+        <div class="card-title" style="margin-top: 0.5rem;">Ağ Seç</div>
+        <div id="wifiNetworks" style="margin-bottom: 0.75rem; color: var(--text-dim); font-size: 0.85rem;">
+            Taranıyor...
+        </div>
+        <div class="form-group">
+            <label for="wifiSsid">SSID</label>
+            <input type="text" id="wifiSsid" placeholder="Ağ adı">
+        </div>
+        <div class="form-group">
+            <label for="wifiPass">Şifre</label>
+            <input type="password" id="wifiPass">
+        </div>
+        <button class="btn" id="wifiConnectBtn">Bağlan</button>
+        <span id="wifiClientMsg" style="margin-left: 0.75rem; font-size: 0.85rem;"></span>
+    </div>
+
+    <!-- AP Mode Panel -->
+    <div id="apPanel" style="display:none;">
+        <div class="form-group">
+            <label for="apSsid">AP SSID</label>
+            <input type="text" id="apSsid" placeholder="mssRadMon" value="mssRadMon">
+        </div>
+        <div class="form-group">
+            <label for="apPass">AP Şifre (min 8 karakter)</label>
+            <input type="password" id="apPass" placeholder="radmon2026" value="radmon2026">
+        </div>
+        <button class="btn" id="apStartBtn" style="background: var(--yellow); color: #1a1a2e;">AP Başlat</button>
+        <span id="wifiApMsg" style="margin-left: 0.75rem; font-size: 0.85rem;"></span>
+    </div>
+</div>
+
+<div class="card" style="margin-top: 1rem;">
     <div class="card-title">Alarm Geçmişi (Son 24 Saat)</div>
     <table class="alarm-table">
         <thead>

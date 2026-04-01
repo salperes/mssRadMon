@@ -85,5 +85,109 @@ async function loadAlarmHistory() {
 
 document.getElementById("saveBtn").addEventListener("click", saveSettings);
 
+// --- WiFi ---
+
+const wifiStatusEl = document.getElementById("wifiStatus");
+const clientPanel = document.getElementById("clientPanel");
+const apPanel = document.getElementById("apPanel");
+const wifiNetworksEl = document.getElementById("wifiNetworks");
+
+async function loadWifiStatus() {
+    try {
+        const res = await fetch("/api/wifi/status");
+        const s = await res.json();
+        const modeText = s.mode === "ap" ? "AP" : s.mode === "client" ? "Client" : "Bilinmiyor";
+        const dot = s.mode !== "unknown"
+            ? '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin-right:0.4rem;"></span>'
+            : '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--red);margin-right:0.4rem;"></span>';
+        wifiStatusEl.innerHTML = `${dot}<strong>${modeText}</strong> &mdash; SSID: <strong>${s.ssid || "—"}</strong> &mdash; IP: <strong>${s.ip || "—"}</strong>`;
+    } catch (e) {
+        wifiStatusEl.innerHTML = '<span style="color:var(--red)">WiFi durumu alinamadi</span>';
+    }
+}
+
+async function scanNetworks() {
+    wifiNetworksEl.innerHTML = "Taraniyor...";
+    try {
+        const res = await fetch("/api/wifi/scan");
+        const nets = await res.json();
+        if (nets.length === 0) {
+            wifiNetworksEl.innerHTML = "Ag bulunamadi.";
+            return;
+        }
+        wifiNetworksEl.innerHTML = "";
+        const list = document.createElement("div");
+        list.style.cssText = "display:flex;flex-direction:column;gap:0.25rem;max-height:200px;overflow-y:auto;";
+        nets.forEach(n => {
+            const item = document.createElement("div");
+            item.style.cssText = "display:flex;justify-content:space-between;align-items:center;padding:0.4rem 0.6rem;background:var(--bg);border-radius:4px;cursor:pointer;font-size:0.85rem;";
+            const signal = n.signal >= 70 ? "var(--green)" : n.signal >= 40 ? "var(--yellow)" : "var(--red)";
+            item.innerHTML = `<span>${n.ssid}</span><span style="color:${signal}">${n.signal}% ${n.security ? "&#x1f512;" : ""}</span>`;
+            item.addEventListener("click", () => {
+                document.getElementById("wifiSsid").value = n.ssid;
+                document.getElementById("wifiPass").value = "";
+                document.getElementById("wifiPass").focus();
+            });
+            list.appendChild(item);
+        });
+        wifiNetworksEl.appendChild(list);
+    } catch (e) {
+        wifiNetworksEl.innerHTML = "Tarama hatasi.";
+    }
+}
+
+document.getElementById("wifiClientBtn").addEventListener("click", () => {
+    clientPanel.style.display = clientPanel.style.display === "none" ? "block" : "none";
+    apPanel.style.display = "none";
+    if (clientPanel.style.display === "block") scanNetworks();
+});
+
+document.getElementById("wifiApBtn").addEventListener("click", () => {
+    apPanel.style.display = apPanel.style.display === "none" ? "block" : "none";
+    clientPanel.style.display = "none";
+});
+
+document.getElementById("wifiConnectBtn").addEventListener("click", async () => {
+    const ssid = document.getElementById("wifiSsid").value;
+    const pass = document.getElementById("wifiPass").value;
+    const msgEl = document.getElementById("wifiClientMsg");
+    if (!ssid) { msgEl.textContent = "SSID giriniz"; msgEl.style.color = "var(--red)"; return; }
+    msgEl.textContent = "Baglaniyor..."; msgEl.style.color = "var(--text-dim)";
+    try {
+        const res = await fetch("/api/wifi/connect", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ssid, password: pass }),
+        });
+        const data = await res.json();
+        msgEl.textContent = data.message;
+        msgEl.style.color = data.ok ? "var(--green)" : "var(--red)";
+        if (data.ok) setTimeout(loadWifiStatus, 2000);
+    } catch (e) {
+        msgEl.textContent = "Baglanti hatasi"; msgEl.style.color = "var(--red)";
+    }
+});
+
+document.getElementById("apStartBtn").addEventListener("click", async () => {
+    const ssid = document.getElementById("apSsid").value;
+    const pass = document.getElementById("apPass").value;
+    const msgEl = document.getElementById("wifiApMsg");
+    msgEl.textContent = "AP baslatiliyor..."; msgEl.style.color = "var(--text-dim)";
+    try {
+        const res = await fetch("/api/wifi/ap", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ssid, password: pass }),
+        });
+        const data = await res.json();
+        msgEl.textContent = data.message;
+        msgEl.style.color = data.ok ? "var(--green)" : "var(--red)";
+        if (data.ok) setTimeout(loadWifiStatus, 2000);
+    } catch (e) {
+        msgEl.textContent = "AP baslatma hatasi"; msgEl.style.color = "var(--red)";
+    }
+});
+
 loadSettings();
 loadAlarmHistory();
+loadWifiStatus();
