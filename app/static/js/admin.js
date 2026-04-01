@@ -485,7 +485,8 @@ async function msgServiceAction(endpoint, body, resultEl) {
             resultEl.textContent = msg;
             resultEl.style.color = "var(--green)";
         } else {
-            resultEl.textContent = `Hata: ${data.message || "Bilinmeyen hata"}`;
+            const errMsg = data.message || data.detail || `HTTP ${res.status}`;
+            resultEl.textContent = `Hata: ${errMsg}`;
             resultEl.style.color = "var(--red)";
         }
     } catch (e) {
