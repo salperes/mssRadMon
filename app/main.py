@@ -47,6 +47,13 @@ def create_app() -> FastAPI:
 
         reader = GammaScoutReader()
 
+        # Kümülatif dozu DB'deki son değerden devam ettir
+        last_row = await db.fetch_one(
+            "SELECT cumulative_dose FROM readings ORDER BY id DESC LIMIT 1"
+        )
+        if last_row:
+            reader._cumulative_dose = last_row["cumulative_dose"]
+
         # App state'e ata
         app.state.db = db
         app.state.config = config
