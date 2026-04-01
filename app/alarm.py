@@ -1,6 +1,7 @@
 """Alarm yonetimi — esik kontrolu, GPIO cikislari, e-posta."""
 import asyncio
 import logging
+from app import msg_service
 import smtplib
 from datetime import datetime, timezone
 from email.message import EmailMessage
@@ -154,6 +155,10 @@ class AlarmManager:
         if email_enabled == "true":
             await self._send_email(level, dose_rate)
 
+        # msgService bildirimleri
+        await self._send_msgservice_mail(level, dose_rate)
+        await self._send_msgservice_wa(level, dose_rate)
+
         logger.warning("ALARM %s: %.3f µSv/h — aksiyonlar: %s", level.value, dose_rate, action_taken)
 
     async def _clear_alarm(self):
@@ -262,6 +267,57 @@ class AlarmManager:
         except Exception as e:
             logger.error("Test e-postasi hatasi: %s", e)
             return {"ok": False, "message": str(e)}
+
+    async def _send_msgservice_mail(self, level: AlarmLevel, dose_rate: float):
+        """msgService uzerinden alarm maili gonder."""
+        if await self._config.get("msg_service_mail_enabled") != "true":
+            return
+        base_url = await self._config.get("msg_service_url") or ""
+        api_key = await self._config.get("msg_service_api_key") or ""
+        reply_to = await self._config.get("msg_service_reply_to") or ""
+        to_raw = await self._config.get(f"msg_service_{level.value}_mail_to") or ""
+        to_list = [e.strip() for e in to_raw.split(",") if e.strip()]
+        if not to_list:
+            return
+        device_name = await self._config.get("device_name") or "GammaScout-01"
+        device_location = await self._config.get("device_location") or ""
+        label = level.value.upper().replace("_", "-")
+        loop = asyncio.get_event_loop()
+        msg_id = await loop.run_in_executor(
+            None,
+            lambda: msg_service.send_mail(
+                base_url, api_key, to_list, reply_to,
+                label, dose_rate, device_name, device_location,
+            ),
+        )
+        if msg_id:
+            logger.info("msgService mail gonderildi: %s -> %s", level.value, msg_id)
+        else:
+            logger.warning("msgService mail gonderilemedi (level=%s)", level.value)
+
+    async def _send_msgservice_wa(self, level: AlarmLevel, dose_rate: float):
+        """msgService uzerinden alarm WA mesaji gonder."""
+        if await self._config.get("msg_service_wa_enabled") != "true":
+            return
+        base_url = await self._config.get("msg_service_url") or ""
+        api_key = await self._config.get("msg_service_api_key") or ""
+        to_raw = await self._config.get(f"msg_service_{level.value}_wa_to") or ""
+        phone_list = [p.strip() for p in to_raw.split(",") if p.strip()]
+        if not phone_list:
+            return
+        device_name = await self._config.get("device_name") or "GammaScout-01"
+        label = level.value.upper().replace("_", "-")
+        loop = asyncio.get_event_loop()
+        results = await loop.run_in_executor(
+            None,
+            lambda: msg_service.send_whatsapp(
+                base_url, api_key, phone_list, label, dose_rate, device_name,
+            ),
+        )
+        sent = sum(1 for r in results if r)
+        logger.info(
+            "msgService WA gonderildi: %d/%d (level=%s)", sent, len(phone_list), level.value
+        )
 
     def shutdown(self):
         """GPIO'lari kapat."""
