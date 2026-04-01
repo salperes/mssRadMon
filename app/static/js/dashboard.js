@@ -14,6 +14,10 @@ const chartRangeEl = document.getElementById("chartRange");
 const shiftNameEl = document.getElementById("shiftName");
 const shiftDoseEl = document.getElementById("shiftDose");
 const shiftHistoryBody = document.getElementById("shiftHistoryBody");
+const monthlyDoseEl = document.getElementById("monthlyDose");
+const quarterlyDoseEl = document.getElementById("quarterlyDose");
+const halfYearlyDoseEl = document.getElementById("halfYearlyDose");
+const yearlyDoseEl = document.getElementById("yearlyDose");
 
 let thresholdHigh = 0.5;
 let thresholdHighHigh = 1.0;
@@ -137,6 +141,20 @@ function updatePendingAlarm(pending, level, elapsed, duration) {
     }
 }
 
+async function loadPeriodDoses() {
+    try {
+        const res = await fetch("/api/period-doses");
+        const d = await res.json();
+        dailyDoseEl.textContent = d.daily.toFixed(3);
+        monthlyDoseEl.textContent = d.monthly.toFixed(3);
+        quarterlyDoseEl.textContent = d.quarterly.toFixed(3);
+        halfYearlyDoseEl.textContent = d.half_yearly.toFixed(3);
+        yearlyDoseEl.textContent = d.yearly.toFixed(3);
+    } catch (e) {
+        console.error("Periyot dozları yüklenemedi:", e);
+    }
+}
+
 async function loadShiftHistory() {
     try {
         const res = await fetch("/api/shift/history?days=7");
@@ -220,9 +238,7 @@ async function loadInitial() {
             updatePendingAlarm(true, current.alarm_pending_level, current.alarm_pending_elapsed, current.alarm_pending_duration);
         }
 
-        const dailyRes = await fetch("/api/daily-dose");
-        const daily = await dailyRes.json();
-        dailyDoseEl.textContent = daily.daily_dose.toFixed(3);
+        await loadPeriodDoses();
 
         const shiftRes = await fetch("/api/shift/current");
         const shift = await shiftRes.json();
@@ -256,9 +272,7 @@ function connectWS() {
         if (msg.type === "reading") {
             updateDoseRate(msg.dose_rate);
             addChartPoint(msg.timestamp, msg.dose_rate);
-            fetch("/api/daily-dose")
-                .then(r => r.json())
-                .then(d => { dailyDoseEl.textContent = d.daily_dose.toFixed(3); });
+            loadPeriodDoses();
             updateShift(msg.shift_active, msg.shift_name, msg.shift_dose);
             if (msg.alarm_pending) {
                 updatePendingAlarm(true, msg.alarm_pending_level, msg.alarm_pending_elapsed, msg.alarm_pending_duration);
@@ -296,6 +310,8 @@ setInterval(async () => {
         updateConnection(data.connected);
     } catch (e) { /* ignore */ }
 }, 5000);
+
+setInterval(loadPeriodDoses, 60000);
 
 loadInitial();
 connectWS();
