@@ -12,6 +12,7 @@
             <a href="#" class="sidebar-link" data-section="email">E-posta</a>
             <a href="#" class="sidebar-link" data-section="remotelog">Uzak Log</a>
             <a href="#" class="sidebar-link" data-section="wifi">WiFi</a>
+            <a href="#" class="sidebar-link" data-section="shifts">Vardiyalar</a>
             <a href="#" class="sidebar-link" data-section="history">Alarm Geçmişi</a>
         </nav>
     </aside>
@@ -245,6 +246,42 @@
                     <button class="btn" id="apStartBtn" style="background: var(--yellow); color: #1a1a2e;">AP Başlat</button>
                     <span id="wifiApMsg" style="margin-left: 0.75rem; font-size: 0.85rem;"></span>
                 </div>
+            </div>
+        </section>
+
+        <!-- Vardiyalar -->
+        <section class="admin-section" id="sec-shifts">
+            <h2 class="section-title">Vardiya Ayarları</h2>
+            <div id="shiftList"></div>
+            <div class="card">
+                <div class="card-title">Yeni Vardiya Ekle</div>
+                <div class="form-group">
+                    <label for="newShiftName">Vardiya Adı</label>
+                    <input type="text" id="newShiftName" placeholder="Vardiya 1">
+                </div>
+                <div class="dashboard-grid">
+                    <div class="form-group">
+                        <label for="newShiftStart">Başlangıç Saati</label>
+                        <input type="time" id="newShiftStart" value="08:00">
+                    </div>
+                    <div class="form-group">
+                        <label for="newShiftEnd">Bitiş Saati</label>
+                        <input type="time" id="newShiftEnd" value="16:00">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Aktif Günler</label>
+                    <div class="shift-days-row" id="newShiftDays">
+                        <label class="shift-day-check"><input type="checkbox" value="1" checked> Pzt</label>
+                        <label class="shift-day-check"><input type="checkbox" value="2" checked> Sal</label>
+                        <label class="shift-day-check"><input type="checkbox" value="3" checked> Çar</label>
+                        <label class="shift-day-check"><input type="checkbox" value="4" checked> Per</label>
+                        <label class="shift-day-check"><input type="checkbox" value="5" checked> Cum</label>
+                        <label class="shift-day-check"><input type="checkbox" value="6"> Cmt</label>
+                        <label class="shift-day-check"><input type="checkbox" value="7"> Paz</label>
+                    </div>
+                </div>
+                <button class="btn" id="addShiftBtn">Vardiya Ekle</button>
             </div>
         </section>
 

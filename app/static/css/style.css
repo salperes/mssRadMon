@@ -247,3 +247,37 @@ body {
         font-size: 0.8rem;
     }
 }
+
+/* Shift day checkboxes */
+.shift-days-row {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+.shift-day-check {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.85rem;
+    color: var(--text);
+    cursor: pointer;
+}
+.shift-day-check input[type="checkbox"] {
+    width: auto;
+    accent-color: var(--accent);
+}
+.shift-card {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 0.75rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+.shift-card-info { flex: 1; min-width: 200px; }
+.shift-card-name { font-weight: 600; font-size: 1rem; margin-bottom: 0.25rem; }
+.shift-card-detail { font-size: 0.85rem; color: var(--text-dim); }
+.shift-card-days { font-size: 0.8rem; color: var(--accent); margin-top: 0.2rem; }
