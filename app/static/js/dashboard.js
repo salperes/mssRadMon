@@ -128,6 +128,15 @@ function updateShift(active, name, dose) {
     }
 }
 
+function updatePendingAlarm(pending, level, elapsed, duration) {
+    if (pending) {
+        const levelText = level === "high_high" ? "KRITIK eşik aşıldı" : "HIGH eşiği aşıldı";
+        alarmBanner.className = "alarm-banner active " + (level === "high_high" ? "high_high" : "high");
+        alarmLevel.textContent = "ÖN UYARI";
+        alarmMsg.textContent = `${levelText} — ${elapsed}/${duration} sn`;
+    }
+}
+
 async function loadShiftHistory() {
     try {
         const res = await fetch("/api/shift/history?days=7");
@@ -206,6 +215,9 @@ async function loadInitial() {
             updateDoseRate(current.dose_rate);
         }
         updateConnection(current.connected);
+        if (current.alarm_pending) {
+            updatePendingAlarm(true, current.alarm_pending_level, current.alarm_pending_elapsed, current.alarm_pending_duration);
+        }
 
         const dailyRes = await fetch("/api/daily-dose");
         const daily = await dailyRes.json();
@@ -247,6 +259,11 @@ function connectWS() {
                 .then(r => r.json())
                 .then(d => { dailyDoseEl.textContent = d.daily_dose.toFixed(3); });
             updateShift(msg.shift_active, msg.shift_name, msg.shift_dose);
+            if (msg.alarm_pending) {
+                updatePendingAlarm(true, msg.alarm_pending_level, msg.alarm_pending_elapsed, msg.alarm_pending_duration);
+            } else {
+                alarmBanner.className = "alarm-banner";
+            }
         }
     };
 
