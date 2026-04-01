@@ -10,7 +10,7 @@
     <strong id="alarmLevel"></strong>: <span id="alarmMsg"></span>
 </div>
 
-<div class="dashboard-grid">
+<div class="dashboard-grid dashboard-grid-3">
     <div class="card">
         <div class="card-title">Anlık Doz Hızı</div>
         <div>
@@ -22,6 +22,16 @@
         <div class="card-title">Günlük Kümülatif Doz</div>
         <div>
             <span class="daily-dose-value" id="dailyDose">—</span>
+            <span class="dose-rate-unit">µSv</span>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-title">Vardiya Dozu</div>
+        <div>
+            <span class="shift-name" id="shiftName">—</span>
+        </div>
+        <div>
+            <span class="daily-dose-value" id="shiftDose">—</span>
             <span class="dose-rate-unit">µSv</span>
         </div>
     </div>
@@ -45,6 +55,17 @@
     <div class="chart-container">
         <canvas id="doseChart"></canvas>
     </div>
+</div>
+
+<div class="card">
+    <div class="card-title">Vardiya Doz Geçmişi</div>
+    <table class="alarm-table" id="shiftHistoryTable">
+        <thead>
+            <tr><th>Tarih</th><th>Vardiya</th><th>Saat</th><th>Doz (µSv)</th></tr>
+        </thead>
+        <tbody id="shiftHistoryBody">
+        </tbody>
+    </table>
 </div>
 {% endblock %}
 
