@@ -125,8 +125,13 @@
                     </label>
                 </div>
                 <div class="form-group">
-                    <label for="alarm_email_to">Alıcı Adresi</label>
-                    <input type="email" id="alarm_email_to">
+                    <label>Alıcılar</label>
+                    <div id="emailRecipients" style="display:flex;flex-direction:column;gap:0.25rem;margin-bottom:0.5rem;"></div>
+                    <div style="display:flex;gap:0.5rem;">
+                        <input type="email" id="newEmailAddr" placeholder="ornek@mail.com" style="flex:1;">
+                        <button type="button" class="btn" id="addEmailBtn" style="padding:0.4rem 0.75rem;">Ekle</button>
+                    </div>
+                    <input type="hidden" id="alarm_email_to">
                 </div>
                 <div style="margin-bottom:1rem;">
                     <button type="button" class="btn" id="gmailPresetBtn" style="background:var(--surface);border:1px solid rgba(255,255,255,0.15);font-size:0.8rem;padding:0.35rem 0.75rem;">Gmail Ayarlarını Doldur</button>

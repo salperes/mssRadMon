@@ -54,6 +54,7 @@ async function loadSettings() {
                 el.value = settings[key] || "";
             }
         });
+        renderRecipients();
     } catch (e) {
         console.error("Ayarlar yuklenemedi:", e);
     }
@@ -97,6 +98,50 @@ document.querySelectorAll(".save-section-btn").forEach(btn => {
         const msg = btn.parentElement.querySelector(".save-section-msg");
         saveSettings(msg);
     });
+});
+
+// --- Email Recipients ---
+
+function renderRecipients() {
+    const container = document.getElementById("emailRecipients");
+    const hidden = document.getElementById("alarm_email_to");
+    const emails = hidden.value ? hidden.value.split(",").map(e => e.trim()).filter(Boolean) : [];
+    container.innerHTML = "";
+    if (emails.length === 0) {
+        container.innerHTML = '<span style="font-size:0.8rem;color:var(--text-dim);">Alıcı yok</span>';
+        return;
+    }
+    emails.forEach(email => {
+        const item = document.createElement("div");
+        item.style.cssText = "display:flex;justify-content:space-between;align-items:center;padding:0.35rem 0.6rem;background:var(--bg);border-radius:4px;font-size:0.85rem;";
+        const del = document.createElement("button");
+        del.textContent = "Sil";
+        del.style.cssText = "background:none;border:1px solid var(--red);color:var(--red);border-radius:4px;padding:0.1rem 0.4rem;cursor:pointer;font-size:0.75rem;";
+        del.addEventListener("click", () => {
+            const list = hidden.value.split(",").map(e => e.trim()).filter(e => e !== email);
+            hidden.value = list.join(",");
+            renderRecipients();
+        });
+        item.innerHTML = `<span>${email}</span>`;
+        item.appendChild(del);
+        container.appendChild(item);
+    });
+}
+
+document.getElementById("addEmailBtn").addEventListener("click", () => {
+    const input = document.getElementById("newEmailAddr");
+    const addr = input.value.trim();
+    if (!addr || !addr.includes("@")) return;
+    const hidden = document.getElementById("alarm_email_to");
+    const list = hidden.value ? hidden.value.split(",").map(e => e.trim()).filter(Boolean) : [];
+    if (!list.includes(addr)) list.push(addr);
+    hidden.value = list.join(",");
+    input.value = "";
+    renderRecipients();
+});
+
+document.getElementById("newEmailAddr").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); document.getElementById("addEmailBtn").click(); }
 });
 
 // --- Test Email ---
