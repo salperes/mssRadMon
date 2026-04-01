@@ -15,6 +15,7 @@ from app.db import Database
 from app.remote_log import RemoteLogForwarder
 from app.routers import admin, api, ws
 from app.serial_reader import GammaScoutReader, Reading
+from app.shift import ShiftManager
 from app import wifi
 
 logging.basicConfig(
@@ -44,6 +45,9 @@ def create_app() -> FastAPI:
         alarm_manager = AlarmManager(db=db, config=config)
         await alarm_manager.init()
 
+        shift_manager = ShiftManager(db=db, config=config)
+        await shift_manager.close_stale()
+
         remote_log = RemoteLogForwarder(db=db, config=config)
 
         reader = GammaScoutReader()
@@ -60,6 +64,7 @@ def create_app() -> FastAPI:
         app.state.config = config
         app.state.alarm = alarm_manager
         app.state.remote_log = remote_log
+        app.state.shift_manager = shift_manager
         app.state.reader = reader
         app.state.ws_clients = set()
 
@@ -76,12 +81,18 @@ def create_app() -> FastAPI:
             )
             # Alarm kontrolü
             await alarm_manager.check(reading.dose_rate)
+            # Vardiya doz takibi
+            await shift_manager.check(reading.cumulative_dose)
             # WebSocket push
+            shift_info = await shift_manager.get_current()
             msg = {
                 "type": "reading",
                 "timestamp": reading.timestamp,
                 "dose_rate": reading.dose_rate,
                 "cumulative_dose": reading.cumulative_dose,
+                "shift_name": shift_info["shift_name"],
+                "shift_dose": shift_info["shift_dose"],
+                "shift_active": shift_info["active"],
             }
             for client in list(app.state.ws_clients):
                 try:
