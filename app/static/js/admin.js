@@ -195,10 +195,42 @@ async function scanNetworks() {
     }
 }
 
+async function loadSavedNetworks() {
+    const el = document.getElementById("savedNetworks");
+    try {
+        const res = await fetch("/api/wifi/saved");
+        const nets = await res.json();
+        if (nets.length === 0) {
+            el.innerHTML = "Kayitli ag yok.";
+            return;
+        }
+        el.innerHTML = "";
+        const list = document.createElement("div");
+        list.style.cssText = "display:flex;flex-direction:column;gap:0.25rem;";
+        nets.forEach(n => {
+            const item = document.createElement("div");
+            item.style.cssText = "display:flex;justify-content:space-between;align-items:center;padding:0.4rem 0.6rem;background:var(--bg);border-radius:4px;font-size:0.85rem;";
+            const delBtn = document.createElement("button");
+            delBtn.textContent = "Sil";
+            delBtn.style.cssText = "background:none;border:1px solid var(--red);color:var(--red);border-radius:4px;padding:0.15rem 0.5rem;cursor:pointer;font-size:0.75rem;";
+            delBtn.addEventListener("click", async () => {
+                await fetch(`/api/wifi/saved/${encodeURIComponent(n.ssid)}`, { method: "DELETE" });
+                loadSavedNetworks();
+            });
+            item.innerHTML = `<span>${n.ssid} ${n.has_password ? "&#x1f512;" : ""}</span>`;
+            item.appendChild(delBtn);
+            list.appendChild(item);
+        });
+        el.appendChild(list);
+    } catch (e) {
+        el.innerHTML = "Yuklenemedi.";
+    }
+}
+
 document.getElementById("wifiClientBtn").addEventListener("click", () => {
     clientPanel.style.display = clientPanel.style.display === "none" ? "block" : "none";
     apPanel.style.display = "none";
-    if (clientPanel.style.display === "block") scanNetworks();
+    if (clientPanel.style.display === "block") { scanNetworks(); loadSavedNetworks(); }
 });
 
 document.getElementById("wifiApBtn").addEventListener("click", () => {
@@ -221,9 +253,29 @@ document.getElementById("wifiConnectBtn").addEventListener("click", async () => 
         const data = await res.json();
         msgEl.textContent = data.message;
         msgEl.style.color = data.ok ? "var(--green)" : "var(--red)";
-        if (data.ok) setTimeout(loadWifiStatus, 2000);
+        if (data.ok) { setTimeout(loadWifiStatus, 2000); loadSavedNetworks(); }
     } catch (e) {
         msgEl.textContent = "Baglanti hatasi"; msgEl.style.color = "var(--red)";
+    }
+});
+
+document.getElementById("wifiSaveOnlyBtn").addEventListener("click", async () => {
+    const ssid = document.getElementById("wifiSsid").value;
+    const pass = document.getElementById("wifiPass").value;
+    const msgEl = document.getElementById("wifiClientMsg");
+    if (!ssid) { msgEl.textContent = "SSID giriniz"; msgEl.style.color = "var(--red)"; return; }
+    try {
+        const res = await fetch("/api/wifi/saved", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ssid, password: pass }),
+        });
+        const data = await res.json();
+        msgEl.textContent = data.ok ? "Kaydedildi" : data.message;
+        msgEl.style.color = data.ok ? "var(--green)" : "var(--red)";
+        if (data.ok) loadSavedNetworks();
+    } catch (e) {
+        msgEl.textContent = "Kaydetme hatasi"; msgEl.style.color = "var(--red)";
     }
 });
 

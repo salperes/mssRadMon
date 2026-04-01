@@ -174,7 +174,10 @@
                 </div>
 
                 <div id="clientPanel" style="display:none;">
-                    <div class="card-title" style="margin-top: 0.5rem;">Ağ Seç</div>
+                    <div class="card-title" style="margin-top: 0.5rem;">Kayıtlı Ağlar</div>
+                    <div id="savedNetworks" style="margin-bottom: 1rem; font-size: 0.85rem; color: var(--text-dim);">Yükleniyor...</div>
+
+                    <div class="card-title">Ağ Ekle / Bağlan</div>
                     <div id="wifiNetworks" style="margin-bottom: 0.75rem; color: var(--text-dim); font-size: 0.85rem;">
                         Taranıyor...
                     </div>
@@ -186,8 +189,11 @@
                         <label for="wifiPass">Şifre</label>
                         <input type="password" id="wifiPass">
                     </div>
-                    <button class="btn" id="wifiConnectBtn">Bağlan</button>
-                    <span id="wifiClientMsg" style="margin-left: 0.75rem; font-size: 0.85rem;"></span>
+                    <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
+                        <button class="btn" id="wifiConnectBtn">Kaydet & Bağlan</button>
+                        <button class="btn" id="wifiSaveOnlyBtn" style="background: var(--surface); border: 1px solid var(--accent);">Sadece Kaydet</button>
+                        <span id="wifiClientMsg" style="font-size: 0.85rem;"></span>
+                    </div>
                 </div>
 
                 <div id="apPanel" style="display:none;">

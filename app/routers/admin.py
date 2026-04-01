@@ -42,13 +42,45 @@ async def wifi_scan():
 
 
 @router.post("/wifi/connect")
-async def wifi_connect(body: dict):
-    """Client modunda WiFi ağına bağlan."""
+async def wifi_connect(request: Request, body: dict):
+    """Client modunda WiFi ağına bağlan ve listeye kaydet."""
+    config = request.app.state.config
     ssid = body.get("ssid", "")
     password = body.get("password", "")
     if not ssid:
         return {"ok": False, "message": "SSID gerekli"}
-    return await wifi.connect_client(ssid, password)
+    result = await wifi.connect_client(ssid, password)
+    if result["ok"]:
+        await wifi.add_saved_network(config, ssid, password)
+    return result
+
+
+@router.get("/wifi/saved")
+async def wifi_saved(request: Request):
+    """Kayıtlı ağ listesini döndür (şifreler maskelenir)."""
+    config = request.app.state.config
+    nets = await wifi.get_saved_networks(config)
+    return [{"ssid": n["ssid"], "has_password": bool(n.get("password"))} for n in nets]
+
+
+@router.post("/wifi/saved")
+async def wifi_add_saved(request: Request, body: dict):
+    """Kayıtlı ağ ekle/güncelle."""
+    config = request.app.state.config
+    ssid = body.get("ssid", "")
+    password = body.get("password", "")
+    if not ssid:
+        return {"ok": False, "message": "SSID gerekli"}
+    nets = await wifi.add_saved_network(config, ssid, password)
+    return {"ok": True, "count": len(nets)}
+
+
+@router.delete("/wifi/saved/{ssid}")
+async def wifi_remove_saved(request: Request, ssid: str):
+    """Kayıtlı ağı sil."""
+    config = request.app.state.config
+    nets = await wifi.remove_saved_network(config, ssid)
+    return {"ok": True, "count": len(nets)}
 
 
 @router.post("/wifi/ap")

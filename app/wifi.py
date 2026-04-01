@@ -1,7 +1,11 @@
-"""WiFi yönetimi — nmcli üzerinden AP ve Client mod kontrolü."""
+"""WiFi yönetimi — nmcli üzerinden AP ve Client mod kontrolü.
+
+Kayıtlı ağlar DB'de JSON olarak tutulur. Periyodik olarak taranır,
+bilinen bir ağ görülürse bağlanılır. İlk bağlantıda IP mail ile bildirilir.
+"""
 import asyncio
+import json
 import logging
-import re
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +17,6 @@ WIFI_DEVICE = "wlan0"
 
 
 async def _run(cmd: str) -> tuple[int, str]:
-    """Shell komutu çalıştır, (returncode, stdout) döndür."""
     proc = await asyncio.create_subprocess_shell(
         cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT
     )
@@ -21,20 +24,21 @@ async def _run(cmd: str) -> tuple[int, str]:
     return proc.returncode, stdout.decode(errors="replace").strip()
 
 
+# --- Status & Scan ---
+
 async def get_wifi_status() -> dict:
-    """Mevcut WiFi durumunu döndür."""
-    rc, out = await _run(f"nmcli -t -f GENERAL.TYPE,GENERAL.STATE,GENERAL.CONNECTION dev show {WIFI_DEVICE}")
+    rc, out = await _run(
+        f"nmcli -t -f GENERAL.TYPE,GENERAL.STATE,GENERAL.CONNECTION dev show {WIFI_DEVICE}"
+    )
     lines = dict(line.split(":", 1) for line in out.splitlines() if ":" in line)
 
     mode = "unknown"
     ssid = ""
     ip = ""
-
     con_name = lines.get("GENERAL.CONNECTION", "")
 
     if con_name == AP_CON_NAME:
         mode = "ap"
-        # AP SSID'ini al
         rc2, ssid_out = await _run(
             f"nmcli -t -f 802-11-wireless.ssid con show {AP_CON_NAME}"
         )
@@ -48,10 +52,7 @@ async def get_wifi_status() -> dict:
         if rc2 == 0 and ":" in ssid_out:
             ssid = ssid_out.split(":", 1)[1]
 
-    # IP adresi
-    rc3, ip_out = await _run(
-        f"nmcli -t -f IP4.ADDRESS dev show {WIFI_DEVICE}"
-    )
+    rc3, ip_out = await _run(f"nmcli -t -f IP4.ADDRESS dev show {WIFI_DEVICE}")
     if rc3 == 0:
         for line in ip_out.splitlines():
             if "IP4.ADDRESS" in line and ":" in line:
@@ -62,13 +63,11 @@ async def get_wifi_status() -> dict:
 
 
 async def scan_networks() -> list[dict]:
-    """Yakındaki WiFi ağlarını tara."""
-    # Rescan tetikle
     await _run(f"nmcli dev wifi rescan ifname {WIFI_DEVICE}")
     await asyncio.sleep(2)
 
     rc, out = await _run(
-        f"nmcli -t -f SSID,SIGNAL,SECURITY,FREQ dev wifi list ifname {WIFI_DEVICE}"
+        f"nmcli -t -f SSID,SIGNAL,SECURITY dev wifi list ifname {WIFI_DEVICE}"
     )
     if rc != 0:
         return []
@@ -93,24 +92,58 @@ async def scan_networks() -> list[dict]:
     return networks
 
 
+# --- Saved Networks (DB) ---
+
+async def get_saved_networks(config) -> list[dict]:
+    """Kayıtlı ağ listesini döndür. Format: [{"ssid": "...", "password": "..."}]"""
+    raw = await config.get("wifi_saved_networks")
+    if not raw:
+        return []
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return []
+
+
+async def save_networks(config, networks: list[dict]):
+    await config.set("wifi_saved_networks", json.dumps(networks, ensure_ascii=False))
+
+
+async def add_saved_network(config, ssid: str, password: str) -> list[dict]:
+    """Ağı listeye ekle veya güncelle."""
+    nets = await get_saved_networks(config)
+    for n in nets:
+        if n["ssid"] == ssid:
+            n["password"] = password
+            await save_networks(config, nets)
+            return nets
+    nets.append({"ssid": ssid, "password": password})
+    await save_networks(config, nets)
+    return nets
+
+
+async def remove_saved_network(config, ssid: str) -> list[dict]:
+    nets = await get_saved_networks(config)
+    nets = [n for n in nets if n["ssid"] != ssid]
+    await save_networks(config, nets)
+    return nets
+
+
+# --- Connect ---
+
 async def connect_client(ssid: str, password: str) -> dict:
-    """Client moduna geç ve belirtilen ağa bağlan."""
-    # Önce AP aktifse kapat
     await _run(f"nmcli con down {AP_CON_NAME}")
 
-    # Mevcut bağlantıyı kontrol et
-    rc, existing = await _run(f"nmcli -t -f NAME con show")
+    rc, existing = await _run("nmcli -t -f NAME con show")
     con_names = [line.strip() for line in existing.splitlines()]
 
     if ssid in con_names:
-        # Mevcut profili güncelle ve bağlan
         if password:
             await _run(
                 f"nmcli con modify \"{ssid}\" wifi-sec.key-mgmt wpa-psk wifi-sec.psk \"{password}\""
             )
         rc, out = await _run(f"nmcli con up \"{ssid}\"")
     else:
-        # Yeni bağlantı oluştur
         if password:
             rc, out = await _run(
                 f"nmcli dev wifi connect \"{ssid}\" password \"{password}\" ifname {WIFI_DEVICE}"
@@ -126,26 +159,20 @@ async def connect_client(ssid: str, password: str) -> dict:
 
 
 async def start_ap(ssid: str = "", password: str = "") -> dict:
-    """AP modunu başlat."""
     ssid = ssid or AP_DEFAULT_SSID
     password = password or AP_DEFAULT_PASS
 
     if len(password) < 8:
         return {"ok": False, "message": "AP sifresi en az 8 karakter olmali"}
 
-    # Mevcut bağlantıyı kes
-    rc, active = await _run(
-        f"nmcli -t -f NAME,DEVICE con show --active"
-    )
+    rc, active = await _run(f"nmcli -t -f NAME,DEVICE con show --active")
     for line in active.splitlines():
         parts = line.split(":")
         if len(parts) >= 2 and parts[1] == WIFI_DEVICE:
             await _run(f"nmcli con down \"{parts[0]}\"")
 
-    # Eski AP profili varsa sil
     await _run(f"nmcli con delete {AP_CON_NAME}")
 
-    # Yeni AP oluştur
     rc, out = await _run(
         f"nmcli con add type wifi ifname {WIFI_DEVICE} con-name {AP_CON_NAME} "
         f"autoconnect no ssid \"{ssid}\" "
@@ -160,3 +187,107 @@ async def start_ap(ssid: str = "", password: str = "") -> dict:
     if rc == 0:
         return {"ok": True, "message": f"AP '{ssid}' baslatildi ({AP_DEFAULT_IP.split('/')[0]})"}
     return {"ok": False, "message": out}
+
+
+# --- Auto-connect Loop ---
+
+async def auto_connect_loop(config, alarm_manager, interval: int = 30):
+    """Periyodik olarak kayıtlı ağları tarayıp bağlan. İlk bağlantıda IP mail at."""
+    last_ip = None
+    notified_ip = False
+
+    while True:
+        try:
+            status = await get_wifi_status()
+
+            # Zaten bağlıysa IP takibi yap
+            if status["mode"] == "client" and status["ip"]:
+                current_ip = status["ip"]
+                if current_ip != last_ip:
+                    last_ip = current_ip
+                    notified_ip = False
+
+                if not notified_ip:
+                    await _notify_ip(config, alarm_manager, status["ssid"], current_ip)
+                    notified_ip = True
+
+                await asyncio.sleep(interval)
+                continue
+
+            # Bağlı değilse kayıtlı ağları dene
+            saved = await get_saved_networks(config)
+            if not saved:
+                await asyncio.sleep(interval)
+                continue
+
+            visible = await scan_networks()
+            visible_ssids = {n["ssid"] for n in visible}
+
+            for net in saved:
+                if net["ssid"] in visible_ssids:
+                    logger.info("Kayitli ag bulundu: %s, baglaniliyor...", net["ssid"])
+                    result = await connect_client(net["ssid"], net["password"])
+                    if result["ok"]:
+                        logger.info("Baglandi: %s", net["ssid"])
+                        # IP almak için kısa bekle
+                        await asyncio.sleep(5)
+                        new_status = await get_wifi_status()
+                        if new_status["ip"]:
+                            last_ip = new_status["ip"]
+                            await _notify_ip(config, alarm_manager, net["ssid"], last_ip)
+                            notified_ip = True
+                        break
+                    else:
+                        logger.warning("Baglanti basarisiz %s: %s", net["ssid"], result["message"])
+
+        except Exception as e:
+            logger.error("WiFi auto-connect hatasi: %s", e)
+
+        await asyncio.sleep(interval)
+
+
+async def _notify_ip(config, alarm_manager, ssid: str, ip: str):
+    """Yeni bağlantıda IP adresini mail ile bildir."""
+    logger.info("WiFi baglandi: %s — IP: %s", ssid, ip)
+    email_enabled = await config.get("alarm_email_enabled")
+    if email_enabled != "true":
+        return
+
+    try:
+        from email.message import EmailMessage
+        from datetime import datetime, timezone
+
+        to_addr = await config.get("alarm_email_to")
+        host = await config.get("smtp_host")
+        port = int(await config.get("smtp_port") or "587")
+        user = await config.get("smtp_user")
+        password = await config.get("smtp_pass")
+
+        if not all([to_addr, host, user, password]):
+            return
+
+        msg = EmailMessage()
+        msg["Subject"] = f"[mssRadMon] WiFi baglandi: {ssid} — {ip}"
+        msg["From"] = user
+        msg["To"] = to_addr
+        msg.set_content(
+            f"mssRadMon WiFi baglandı.\n\n"
+            f"Ag: {ssid}\n"
+            f"IP: {ip}\n"
+            f"Zaman: {datetime.now(timezone.utc).isoformat()}\n"
+        )
+
+        import smtplib
+        import asyncio
+        loop = asyncio.get_event_loop()
+
+        def _send():
+            with smtplib.SMTP(host, port) as server:
+                server.starttls()
+                server.login(user, password)
+                server.send_message(msg)
+
+        await loop.run_in_executor(None, _send)
+        logger.info("IP bildirim maili gonderildi: %s -> %s", ip, to_addr)
+    except Exception as e:
+        logger.error("IP bildirim maili hatasi: %s", e)
