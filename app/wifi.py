@@ -280,7 +280,7 @@ async def _notify_ip(config, alarm_manager, ssid: str, ip: str):
             f"{loc_line}"
             f"Ağ: {ssid}\n"
             f"IP: {ip}\n"
-            f"Zaman: {datetime.now(timezone.utc).isoformat()}\n"
+            f"Zaman: {datetime.now().strftime('%H:%M - %d/%m/%Y')}\n"
         )
 
         import smtplib

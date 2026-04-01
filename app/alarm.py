@@ -8,6 +8,11 @@ from enum import Enum
 
 logger = logging.getLogger(__name__)
 
+
+def _local_time() -> str:
+    """Lokal zaman: HH:MM - DD/MM/YYYY"""
+    return datetime.now().strftime("%H:%M - %d/%m/%Y")
+
 try:
     from gpiozero import OutputDevice
 except ImportError:
@@ -153,7 +158,7 @@ class AlarmManager:
                 f"Radyasyon alarmi tetiklendi.\n\n"
                 f"Seviye: {level.value.upper()}\n"
                 f"Doz Hizi: {dose_rate:.3f} µSv/h\n"
-                f"Zaman: {datetime.now(timezone.utc).isoformat()}\n"
+                f"Zaman: {_local_time()}\n"
                 f"Cihaz: GSNJR400"
             )
 
@@ -204,7 +209,7 @@ class AlarmManager:
                 f"{loc_line}"
                 f"{sn_line}"
                 f"IP: {ip}\n"
-                f"Zaman: {datetime.now(timezone.utc).isoformat()}\n"
+                f"Zaman: {_local_time()}\n"
             )
 
             loop = asyncio.get_event_loop()
