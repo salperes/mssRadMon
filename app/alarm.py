@@ -170,6 +170,37 @@ class AlarmManager:
             server.login(user, password)
             server.send_message(msg)
 
+    async def send_test_email(self) -> dict:
+        """Test e-postasi gonder."""
+        try:
+            to_addr = await self._config.get("alarm_email_to")
+            host = await self._config.get("smtp_host")
+            port = int(await self._config.get("smtp_port") or "587")
+            user = await self._config.get("smtp_user")
+            password = await self._config.get("smtp_pass")
+
+            if not all([to_addr, host, user, password]):
+                return {"ok": False, "message": "E-posta ayarlari eksik (alici, SMTP sunucu, kullanici, sifre)"}
+
+            msg = EmailMessage()
+            msg["Subject"] = "[mssRadMon] Test E-postasi"
+            msg["From"] = user
+            msg["To"] = to_addr
+            msg.set_content(
+                f"Bu bir test e-postasıdır.\n\n"
+                f"mssRadMon e-posta bildirimleri düzgün çalışıyor.\n"
+                f"Zaman: {datetime.now(timezone.utc).isoformat()}\n"
+                f"Cihaz: GSNJR400"
+            )
+
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(None, self._smtp_send, host, port, user, password, msg)
+            logger.info("Test e-postasi gonderildi: %s", to_addr)
+            return {"ok": True, "message": f"Test e-postasi gonderildi: {to_addr}"}
+        except Exception as e:
+            logger.error("Test e-postasi hatasi: %s", e)
+            return {"ok": False, "message": str(e)}
+
     def shutdown(self):
         """GPIO'lari kapat."""
         if self._buzzer_task:

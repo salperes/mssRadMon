@@ -98,6 +98,25 @@ document.querySelectorAll(".save-section-btn").forEach(btn => {
     });
 });
 
+// --- Test Email ---
+
+document.getElementById("testEmailBtn").addEventListener("click", async () => {
+    const msgEl = document.getElementById("testEmailMsg");
+    msgEl.textContent = "Gönderiliyor...";
+    msgEl.style.color = "var(--text-dim)";
+    // Önce ayarları kaydet, sonra test gönder
+    await saveSettings(null);
+    try {
+        const res = await fetch("/api/test-email", { method: "POST" });
+        const data = await res.json();
+        msgEl.textContent = data.message;
+        msgEl.style.color = data.ok ? "var(--green)" : "var(--red)";
+    } catch (e) {
+        msgEl.textContent = "Gönderme hatası";
+        msgEl.style.color = "var(--red)";
+    }
+});
+
 // --- Alarm History ---
 
 async function loadAlarmHistory() {

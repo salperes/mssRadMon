@@ -22,6 +22,13 @@ async def update_settings(request: Request, settings: dict):
     return {"status": "ok"}
 
 
+@router.post("/test-email")
+async def test_email(request: Request):
+    """Test e-postası gönder."""
+    alarm = request.app.state.alarm
+    return await alarm.send_test_email()
+
+
 @router.get("/wifi/status")
 async def wifi_status():
     """WiFi durumunu döndür (mod, SSID, IP)."""
