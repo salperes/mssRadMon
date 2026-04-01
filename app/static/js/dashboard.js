@@ -11,6 +11,9 @@ const alarmBanner = document.getElementById("alarmBanner");
 const alarmLevel = document.getElementById("alarmLevel");
 const alarmMsg = document.getElementById("alarmMsg");
 const chartRangeEl = document.getElementById("chartRange");
+const shiftNameEl = document.getElementById("shiftName");
+const shiftDoseEl = document.getElementById("shiftDose");
+const shiftHistoryBody = document.getElementById("shiftHistoryBody");
 
 let thresholdHigh = 0.5;
 let thresholdHighHigh = 1.0;
@@ -115,6 +118,36 @@ function updateConnection(connected) {
     connText.textContent = connected ? "Bagli" : "Baglanti yok";
 }
 
+function updateShift(active, name, dose) {
+    if (active && name) {
+        shiftNameEl.textContent = name;
+        shiftDoseEl.textContent = dose.toFixed(3);
+    } else {
+        shiftNameEl.textContent = "Vardiya dışı";
+        shiftDoseEl.textContent = "—";
+    }
+}
+
+async function loadShiftHistory() {
+    try {
+        const res = await fetch("/api/shift/history?days=7");
+        const rows = await res.json();
+        shiftHistoryBody.innerHTML = "";
+        if (rows.length === 0) {
+            shiftHistoryBody.innerHTML = '<tr><td colspan="4" style="color:var(--text-dim)">Vardiya kaydı yok</td></tr>';
+            return;
+        }
+        rows.forEach(r => {
+            const tr = document.createElement("tr");
+            const dateStr = new Date(r.date).toLocaleDateString("tr-TR");
+            tr.innerHTML = `<td>${dateStr}</td><td>${r.shift_name}</td><td>${r.start_time}–${r.end_time}</td><td>${r.dose.toFixed(3)}</td>`;
+            shiftHistoryBody.appendChild(tr);
+        });
+    } catch (e) {
+        console.error("Vardiya geçmişi yüklenemedi:", e);
+    }
+}
+
 function formatTime(isoStr) {
     const d = new Date(isoStr);
     if (currentRange === "7d" || currentRange === "30d") {
@@ -178,6 +211,12 @@ async function loadInitial() {
         const daily = await dailyRes.json();
         dailyDoseEl.textContent = daily.daily_dose.toFixed(3);
 
+        const shiftRes = await fetch("/api/shift/current");
+        const shift = await shiftRes.json();
+        updateShift(shift.active, shift.shift_name, shift.shift_dose);
+
+        await loadShiftHistory();
+
         const alarmsRes = await fetch("/api/alarms?last=24h");
         const alarms = await alarmsRes.json();
         if (alarms.length > 0) {
@@ -207,6 +246,7 @@ function connectWS() {
             fetch("/api/daily-dose")
                 .then(r => r.json())
                 .then(d => { dailyDoseEl.textContent = d.daily_dose.toFixed(3); });
+            updateShift(msg.shift_active, msg.shift_name, msg.shift_dose);
         }
     };
 
