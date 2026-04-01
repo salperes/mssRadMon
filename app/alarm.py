@@ -182,15 +182,29 @@ class AlarmManager:
             if not all([to_addr, host, user, password]):
                 return {"ok": False, "message": "E-posta ayarlari eksik (alici, SMTP sunucu, kullanici, sifre)"}
 
+            device_name = await self._config.get("device_name") or "GammaScout-01"
+            device_location = await self._config.get("device_location") or ""
+            device_serial = await self._config.get("device_serial") or ""
+
+            from app import wifi
+            status = await wifi.get_wifi_status()
+            ip = status.get("ip", "")
+
+            loc_line = f"Lokasyon: {device_location}\n" if device_location else ""
+            sn_line = f"Seri No: {device_serial}\n" if device_serial else ""
+
             msg = EmailMessage()
-            msg["Subject"] = "[mssRadMon] Test E-postasi"
+            msg["Subject"] = f"[{device_name}] Test E-postası"
             msg["From"] = user
             msg["To"] = to_addr
             msg.set_content(
                 f"Bu bir test e-postasıdır.\n\n"
-                f"mssRadMon e-posta bildirimleri düzgün çalışıyor.\n"
+                f"mssRadMon e-posta bildirimleri düzgün çalışıyor.\n\n"
+                f"Cihaz: {device_name}\n"
+                f"{loc_line}"
+                f"{sn_line}"
+                f"IP: {ip}\n"
                 f"Zaman: {datetime.now(timezone.utc).isoformat()}\n"
-                f"Cihaz: GSNJR400"
             )
 
             loop = asyncio.get_event_loop()
