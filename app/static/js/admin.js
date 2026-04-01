@@ -356,8 +356,102 @@ document.getElementById("apStartBtn").addEventListener("click", async () => {
     }
 });
 
+// --- Shifts ---
+
+const DAY_NAMES = { 1: "Pzt", 2: "Sal", 3: "Çar", 4: "Per", 5: "Cum", 6: "Cmt", 7: "Paz" };
+let currentShifts = [];
+
+function generateShiftId() {
+    return "s" + Date.now().toString(36);
+}
+
+function renderShifts() {
+    const container = document.getElementById("shiftList");
+    container.innerHTML = "";
+    if (currentShifts.length === 0) {
+        container.innerHTML = '<div class="card" style="color:var(--text-dim);text-align:center;padding:2rem;">Tanımlı vardiya yok</div>';
+        return;
+    }
+    currentShifts.forEach((shift, idx) => {
+        const dayStr = shift.days.map(d => DAY_NAMES[d] || d).join(", ");
+        const card = document.createElement("div");
+        card.className = "shift-card";
+        card.innerHTML = `
+            <div class="shift-card-info">
+                <div class="shift-card-name">${shift.name}</div>
+                <div class="shift-card-detail">${shift.start} – ${shift.end}</div>
+                <div class="shift-card-days">${dayStr}</div>
+            </div>
+        `;
+        const delBtn = document.createElement("button");
+        delBtn.textContent = "Sil";
+        delBtn.className = "btn";
+        delBtn.style.cssText = "background:none;border:1px solid var(--red);color:var(--red);padding:0.3rem 0.75rem;font-size:0.8rem;";
+        delBtn.addEventListener("click", () => {
+            currentShifts.splice(idx, 1);
+            renderShifts();
+            saveShifts();
+        });
+        card.appendChild(delBtn);
+        container.appendChild(card);
+    });
+}
+
+async function loadShifts() {
+    try {
+        const res = await fetch("/api/settings");
+        const settings = await res.json();
+        const raw = settings.shifts || "[]";
+        currentShifts = JSON.parse(raw);
+    } catch (e) {
+        currentShifts = [];
+    }
+    renderShifts();
+}
+
+async function saveShifts() {
+    try {
+        await fetch("/api/settings", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ shifts: JSON.stringify(currentShifts) }),
+        });
+    } catch (e) {
+        console.error("Vardiyalar kaydedilemedi:", e);
+    }
+}
+
+document.getElementById("addShiftBtn").addEventListener("click", () => {
+    const name = document.getElementById("newShiftName").value.trim();
+    const start = document.getElementById("newShiftStart").value;
+    const end = document.getElementById("newShiftEnd").value;
+    if (!name || !start || !end) return;
+
+    const dayCheckboxes = document.querySelectorAll("#newShiftDays input[type='checkbox']");
+    const days = [];
+    dayCheckboxes.forEach(cb => { if (cb.checked) days.push(parseInt(cb.value)); });
+    if (days.length === 0) return;
+
+    currentShifts.push({
+        id: generateShiftId(),
+        name: name,
+        start: start,
+        end: end,
+        days: days,
+    });
+
+    renderShifts();
+    saveShifts();
+
+    // Formu temizle
+    document.getElementById("newShiftName").value = "";
+    document.getElementById("newShiftStart").value = "08:00";
+    document.getElementById("newShiftEnd").value = "16:00";
+});
+
 // --- Init ---
 
 loadSettings();
 loadAlarmHistory();
 loadWifiStatus();
+loadShifts();
