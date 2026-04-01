@@ -89,3 +89,17 @@ async def get_alarms(request: Request, last: str = "24h"):
         (since,),
     )
     return rows
+
+
+@router.get("/shift/current")
+async def get_shift_current(request: Request):
+    """Aktif vardiya ve anlik doz."""
+    shift_manager = request.app.state.shift_manager
+    return await shift_manager.get_current()
+
+
+@router.get("/shift/history")
+async def get_shift_history(request: Request, days: int = 7):
+    """Gecmis vardiya dozlari."""
+    shift_manager = request.app.state.shift_manager
+    return await shift_manager.get_history(days=days)
