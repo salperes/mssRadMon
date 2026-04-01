@@ -27,7 +27,8 @@ class RemoteLogForwarder:
     async def _device_info(self) -> dict:
         name = await self._config.get("device_name") or "GammaScout-01"
         location = await self._config.get("device_location") or ""
-        return {"device_name": name, "device_location": location}
+        serial = await self._config.get("device_serial") or ""
+        return {"device_name": name, "device_location": location, "device_serial": serial}
 
     async def forward_reading(self, timestamp: str, dose_rate: float,
                                cumulative_dose: float, row_id: int):

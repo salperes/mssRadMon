@@ -58,7 +58,16 @@ class GammaScoutReader:
         self._running = False
         self._connected = False
         self._cumulative_dose = 0.0
+        self._device_info: DeviceInfo | None = None
         self._on_reading: Callable[[Reading], Awaitable[None]] | None = None
+
+    @property
+    def serial_number(self) -> str:
+        return self._device_info.serial_number if self._device_info else ""
+
+    @property
+    def firmware(self) -> str:
+        return self._device_info.firmware if self._device_info else ""
 
     @property
     def connected(self) -> bool:
@@ -96,6 +105,19 @@ class GammaScoutReader:
             logger.error("Serial bağlantı hatası: %s", e)
             self._connected = False
             return False
+
+    def _query_version(self) -> DeviceInfo | None:
+        """PC moduna girip versiyon/seri no alıp çık."""
+        if not self._serial:
+            return None
+        try:
+            self._send_command(CMD_PC_MODE)
+            resp = self._send_command(CMD_VERSION)
+            self._send_command(CMD_EXIT)
+            return self._parse_version(resp)
+        except serial.SerialException as e:
+            logger.warning("Version sorgusu hatası: %s", e)
+            return None
 
     def enter_online_mode(self) -> bool:
         """Dose rate online moduna geç."""
@@ -224,6 +246,12 @@ class GammaScoutReader:
                 if not self.connect():
                     await asyncio.sleep(5)
                     continue
+                # İlk bağlantıda seri numarasını al
+                if not self._device_info:
+                    loop = asyncio.get_event_loop()
+                    self._device_info = await loop.run_in_executor(None, self._query_version)
+                    if self._device_info:
+                        logger.info("GammaScout FW:%s SN:%s", self._device_info.firmware, self._device_info.serial_number)
                 if not self.enter_online_mode():
                     self.disconnect()
                     await asyncio.sleep(5)

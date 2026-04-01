@@ -65,6 +65,11 @@ def create_app() -> FastAPI:
 
         async def on_reading(reading: Reading):
             """Yeni okuma geldiğinde çağrılır."""
+            # Seri numarasını config'e kaydet (bir kez)
+            if reader.serial_number:
+                current_sn = await config.get("device_serial")
+                if current_sn != reader.serial_number:
+                    await config.set("device_serial", reader.serial_number)
             row_id = await db.execute(
                 "INSERT INTO readings (timestamp, dose_rate, cumulative_dose) VALUES (?, ?, ?)",
                 (reading.timestamp, reading.dose_rate, reading.cumulative_dose),
