@@ -144,6 +144,7 @@ function updatePendingAlarm(pending, level, elapsed, duration) {
 async function loadPeriodDoses() {
     try {
         const res = await fetch("/api/period-doses");
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const d = await res.json();
         dailyDoseEl.textContent = d.daily.toFixed(3);
         monthlyDoseEl.textContent = d.monthly.toFixed(3);
