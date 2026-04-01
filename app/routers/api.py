@@ -90,21 +90,7 @@ async def get_daily_dose(request: Request):
     db = request.app.state.db
     now_local = datetime.now(TZ_TR)
     today_start = _period_start_iso(now_local, "day")
-
-    first = await db.fetch_one(
-        "SELECT cumulative_dose FROM readings WHERE timestamp >= ? ORDER BY timestamp ASC LIMIT 1",
-        (today_start,),
-    )
-    last = await db.fetch_one(
-        "SELECT cumulative_dose FROM readings WHERE timestamp >= ? ORDER BY timestamp DESC LIMIT 1",
-        (today_start,),
-    )
-
-    if first and last:
-        daily = last["cumulative_dose"] - first["cumulative_dose"]
-    else:
-        daily = 0.0
-
+    daily = await _calc_period_dose(db, today_start)
     return {"date": now_local.strftime("%Y-%m-%d"), "daily_dose": daily}
 
 

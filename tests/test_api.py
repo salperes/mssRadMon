@@ -1,6 +1,6 @@
 import pytest
 import pytest_asyncio
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 from datetime import datetime, timezone, timedelta
 
 from app.db import Database
@@ -28,9 +28,10 @@ async def seeded_db(test_db_path):
         ("2026-03-31T23:00:00Z", 0.12, 30.0),
     )
 
+    recent_ts = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
     await db.execute(
         "INSERT INTO alarm_log (timestamp, level, dose_rate, action_taken) VALUES (?, ?, ?, ?)",
-        ("2026-03-31T12:00:00Z", "high", 0.55, "buzzer,light"),
+        (recent_ts, "high", 0.55, "buzzer,light"),
     )
 
     yield db, config
@@ -47,6 +48,11 @@ async def test_get_current(seeded_db):
     request.app.state.db = db
     request.app.state.reader = MagicMock()
     request.app.state.reader.connected = True
+    request.app.state.alarm = MagicMock()
+    request.app.state.alarm.get_pending_info = AsyncMock(return_value={
+        "alarm_pending": False, "alarm_pending_level": None,
+        "alarm_pending_elapsed": 0, "alarm_pending_duration": 0,
+    })
 
     result = await get_current(request)
     assert result["dose_rate"] == 0.12
@@ -65,6 +71,11 @@ async def test_get_current_empty(test_db_path):
     request.app.state.db = db
     request.app.state.reader = MagicMock()
     request.app.state.reader.connected = False
+    request.app.state.alarm = MagicMock()
+    request.app.state.alarm.get_pending_info = AsyncMock(return_value={
+        "alarm_pending": False, "alarm_pending_level": None,
+        "alarm_pending_elapsed": 0, "alarm_pending_duration": 0,
+    })
 
     result = await get_current(request)
     assert result["dose_rate"] is None
