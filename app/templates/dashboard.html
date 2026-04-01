@@ -2,6 +2,7 @@
 {% block title %}Gösterge Paneli — mssRadMon{% endblock %}
 {% block head %}
 <script src="/static/lib/chart.js"></script>
+<script src="/static/lib/chartjs-plugin-annotation.min.js"></script>
 {% endblock %}
 
 {% block content %}
@@ -28,7 +29,14 @@
 
 <div class="card">
     <div class="card-title">
-        Son 1 Saat — Doz Hızı
+        Doz Hızı —
+        <select id="chartRange" class="range-select">
+            <option value="1h">Son 1 Saat</option>
+            <option value="6h">Son 6 Saat</option>
+            <option value="24h">Son 24 Saat</option>
+            <option value="7d">Son 7 Gün</option>
+            <option value="30d">Son 30 Gün</option>
+        </select>
         <span class="conn-indicator" style="float:right">
             <span class="conn-dot" id="connDot"></span>
             <span id="connText">Bağlantı yok</span>

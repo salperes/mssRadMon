@@ -49,6 +49,19 @@ body {
 }
 .card-title { font-size: 0.85rem; color: var(--text-dim); margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em; }
 
+/* Range select */
+.range-select {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 4px;
+    padding: 0.15rem 0.4rem;
+    font-size: 0.8rem;
+    text-transform: none;
+    cursor: pointer;
+}
+.range-select:focus { outline: none; border-color: var(--accent); }
+
 /* Dashboard grid */
 .dashboard-grid {
     display: grid;

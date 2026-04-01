@@ -10,6 +10,11 @@ const connText = document.getElementById("connText");
 const alarmBanner = document.getElementById("alarmBanner");
 const alarmLevel = document.getElementById("alarmLevel");
 const alarmMsg = document.getElementById("alarmMsg");
+const chartRangeEl = document.getElementById("chartRange");
+
+let thresholdHigh = 0.5;
+let thresholdHighHigh = 1.0;
+let currentRange = "1h";
 
 const ctx = document.getElementById("doseChart").getContext("2d");
 const chart = new Chart(ctx, {
@@ -17,7 +22,7 @@ const chart = new Chart(ctx, {
     data: {
         labels: [],
         datasets: [{
-            label: "Doz Hızı (µSv/h)",
+            label: "Doz Hizi (uSv/h)",
             data: [],
             borderColor: "#00bcd4",
             backgroundColor: "rgba(0,188,212,0.1)",
@@ -42,12 +47,56 @@ const chart = new Chart(ctx, {
         },
         plugins: {
             legend: { display: false },
+            annotation: {
+                annotations: {
+                    highLine: {
+                        type: "line",
+                        yMin: thresholdHigh,
+                        yMax: thresholdHigh,
+                        borderColor: "#ffd600",
+                        borderWidth: 1.5,
+                        borderDash: [6, 4],
+                        label: {
+                            display: true,
+                            content: "High",
+                            position: "start",
+                            backgroundColor: "rgba(255,214,0,0.2)",
+                            color: "#ffd600",
+                            font: { size: 10 },
+                            padding: 3,
+                        },
+                    },
+                    highHighLine: {
+                        type: "line",
+                        yMin: thresholdHighHigh,
+                        yMax: thresholdHighHigh,
+                        borderColor: "#ff1744",
+                        borderWidth: 1.5,
+                        borderDash: [6, 4],
+                        label: {
+                            display: true,
+                            content: "High-High",
+                            position: "start",
+                            backgroundColor: "rgba(255,23,68,0.2)",
+                            color: "#ff1744",
+                            font: { size: 10 },
+                            padding: 3,
+                        },
+                    },
+                },
+            },
         },
     },
 });
 
-let thresholdHigh = 0.5;
-let thresholdHighHigh = 1.0;
+function updateThresholdLines() {
+    const ann = chart.options.plugins.annotation.annotations;
+    ann.highLine.yMin = thresholdHigh;
+    ann.highLine.yMax = thresholdHigh;
+    ann.highHighLine.yMin = thresholdHighHigh;
+    ann.highHighLine.yMax = thresholdHighHigh;
+    chart.update("none");
+}
 
 function updateDoseRate(value) {
     doseRateEl.textContent = value.toFixed(3);
@@ -63,19 +112,29 @@ function updateDoseRate(value) {
 
 function updateConnection(connected) {
     connDot.className = connected ? "conn-dot connected" : "conn-dot";
-    connText.textContent = connected ? "Bağlı" : "Bağlantı yok";
+    connText.textContent = connected ? "Bagli" : "Baglanti yok";
 }
 
 function formatTime(isoStr) {
     const d = new Date(isoStr);
+    if (currentRange === "7d" || currentRange === "30d") {
+        return d.toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit" })
+            + " " + d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
+    }
     return d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+
+function setChartData(readings) {
+    chart.data.labels = readings.map(r => formatTime(r.timestamp));
+    chart.data.datasets[0].data = readings.map(r => r.dose_rate);
+    chart.update();
 }
 
 function addChartPoint(timestamp, value) {
     chart.data.labels.push(formatTime(timestamp));
     chart.data.datasets[0].data.push(value);
 
-    const maxPoints = 360;
+    const maxPoints = 3600;
     if (chart.data.labels.length > maxPoints) {
         chart.data.labels.shift();
         chart.data.datasets[0].data.shift();
@@ -83,16 +142,30 @@ function addChartPoint(timestamp, value) {
     chart.update("none");
 }
 
+async function loadReadings(range) {
+    try {
+        const res = await fetch(`/api/readings?last=${range}`);
+        const readings = await res.json();
+        setChartData(readings);
+    } catch (e) {
+        console.error("Okumalar yuklenemedi:", e);
+    }
+}
+
+chartRangeEl.addEventListener("change", () => {
+    currentRange = chartRangeEl.value;
+    loadReadings(currentRange);
+});
+
 async function loadInitial() {
     try {
         const settingsRes = await fetch("/api/settings");
         const settings = await settingsRes.json();
         thresholdHigh = parseFloat(settings.threshold_high || "0.5");
         thresholdHighHigh = parseFloat(settings.threshold_high_high || "1.0");
+        updateThresholdLines();
 
-        const readingsRes = await fetch("/api/readings?last=1h");
-        const readings = await readingsRes.json();
-        readings.forEach(r => addChartPoint(r.timestamp, r.dose_rate));
+        await loadReadings(currentRange);
 
         const currentRes = await fetch("/api/current");
         const current = await currentRes.json();
@@ -110,11 +183,11 @@ async function loadInitial() {
         if (alarms.length > 0) {
             const last = alarms[0];
             alarmBanner.className = "alarm-banner active " + last.level;
-            alarmLevel.textContent = last.level === "high_high" ? "KRİTİK ALARM" : "UYARI";
-            alarmMsg.textContent = `${last.dose_rate.toFixed(3)} µSv/h — ${formatTime(last.timestamp)}`;
+            alarmLevel.textContent = last.level === "high_high" ? "KRITIK ALARM" : "UYARI";
+            alarmMsg.textContent = `${last.dose_rate.toFixed(3)} uSv/h - ${formatTime(last.timestamp)}`;
         }
     } catch (e) {
-        console.error("Başlangıç verileri yüklenemedi:", e);
+        console.error("Baslangic verileri yuklenemedi:", e);
     }
 }
 
@@ -124,7 +197,7 @@ function connectWS() {
     const proto = location.protocol === "https:" ? "wss:" : "ws:";
     ws = new WebSocket(`${proto}//${location.host}/ws/live`);
 
-    ws.onopen = () => console.log("WebSocket bağlandı");
+    ws.onopen = () => console.log("WebSocket baglandi");
 
     ws.onmessage = (event) => {
         const msg = JSON.parse(event.data);
@@ -138,7 +211,7 @@ function connectWS() {
     };
 
     ws.onclose = () => {
-        console.log("WebSocket kapandı, yeniden bağlanılıyor...");
+        console.log("WebSocket kapandi, yeniden baglaniliyor...");
         setTimeout(connectWS, WS_RECONNECT_DELAY);
     };
 
