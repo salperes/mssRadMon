@@ -105,6 +105,15 @@
                     <label for="alarm_email_to">Alıcı Adresi</label>
                     <input type="email" id="alarm_email_to">
                 </div>
+                <div style="margin-bottom:1rem;">
+                    <button type="button" class="btn" id="gmailPresetBtn" style="background:var(--surface);border:1px solid rgba(255,255,255,0.15);font-size:0.8rem;padding:0.35rem 0.75rem;">Gmail Ayarlarını Doldur</button>
+                    <div id="gmailHelp" style="display:none;margin-top:0.5rem;padding:0.6rem 0.8rem;background:var(--surface);border-radius:6px;font-size:0.8rem;color:var(--text-dim);line-height:1.5;">
+                        Gmail kullanmak için <strong>Uygulama Şifresi</strong> gerekir:<br>
+                        1. <a href="https://myaccount.google.com/apppasswords" target="_blank" style="color:var(--accent);">myaccount.google.com/apppasswords</a> adresine gidin<br>
+                        2. Uygulama adı olarak <em>mssRadMon</em> yazıp oluşturun<br>
+                        3. Verilen 16 haneli şifreyi aşağıdaki <strong>SMTP Şifre</strong> alanına yapıştırın
+                    </div>
+                </div>
                 <div class="dashboard-grid">
                     <div class="form-group">
                         <label for="smtp_host">SMTP Sunucu</label>
@@ -118,11 +127,11 @@
                 <div class="dashboard-grid">
                     <div class="form-group">
                         <label for="smtp_user">SMTP Kullanıcı</label>
-                        <input type="text" id="smtp_user">
+                        <input type="text" id="smtp_user" placeholder="ornek@gmail.com">
                     </div>
                     <div class="form-group">
                         <label for="smtp_pass">SMTP Şifre</label>
-                        <input type="password" id="smtp_pass">
+                        <input type="password" id="smtp_pass" placeholder="Uygulama şifresi veya normal şifre">
                     </div>
                 </div>
             </div>

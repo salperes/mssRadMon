@@ -117,6 +117,17 @@ document.getElementById("testEmailBtn").addEventListener("click", async () => {
     }
 });
 
+// --- Gmail Preset ---
+
+document.getElementById("gmailPresetBtn").addEventListener("click", () => {
+    document.getElementById("smtp_host").value = "smtp.gmail.com";
+    document.getElementById("smtp_port").value = "587";
+    const helpEl = document.getElementById("gmailHelp");
+    helpEl.style.display = helpEl.style.display === "none" ? "block" : "none";
+    // smtp_user'a focus ver
+    document.getElementById("smtp_user").focus();
+});
+
 // --- Alarm History ---
 
 async function loadAlarmHistory() {
