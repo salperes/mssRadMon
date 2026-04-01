@@ -85,6 +85,7 @@ def create_app() -> FastAPI:
             await shift_manager.check(reading.cumulative_dose)
             # WebSocket push
             shift_info = await shift_manager.get_current()
+            pending_info = await alarm_manager.get_pending_info()
             msg = {
                 "type": "reading",
                 "timestamp": reading.timestamp,
@@ -93,6 +94,10 @@ def create_app() -> FastAPI:
                 "shift_name": shift_info["shift_name"],
                 "shift_dose": shift_info["shift_dose"],
                 "shift_active": shift_info["active"],
+                "alarm_pending": pending_info["alarm_pending"],
+                "alarm_pending_level": pending_info["alarm_pending_level"],
+                "alarm_pending_elapsed": pending_info["alarm_pending_elapsed"],
+                "alarm_pending_duration": pending_info["alarm_pending_duration"],
             }
             for client in list(app.state.ws_clients):
                 try:

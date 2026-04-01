@@ -22,14 +22,17 @@ async def get_current(request: Request):
         "SELECT timestamp, dose_rate, cumulative_dose FROM readings ORDER BY id DESC LIMIT 1"
     )
     connected = request.app.state.reader.connected
+    alarm = request.app.state.alarm
+    pending = await alarm.get_pending_info()
     if row:
         return {
             "timestamp": row["timestamp"],
             "dose_rate": row["dose_rate"],
             "cumulative_dose": row["cumulative_dose"],
             "connected": connected,
+            **pending,
         }
-    return {"timestamp": None, "dose_rate": None, "cumulative_dose": None, "connected": connected}
+    return {"timestamp": None, "dose_rate": None, "cumulative_dose": None, "connected": connected, **pending}
 
 
 @router.get("/readings")
