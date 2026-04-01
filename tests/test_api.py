@@ -1,6 +1,7 @@
 import pytest
 import pytest_asyncio
 from unittest.mock import MagicMock
+from datetime import datetime, timezone, timedelta
 
 from app.db import Database
 from app.config import Config
@@ -99,3 +100,98 @@ async def test_get_status(seeded_db):
     result = await get_status(request)
     assert result["connected"] is True
     assert result["port"] == "/dev/ttyUSB0"
+
+
+def test_period_start_iso_day():
+    """Günlük başlangıç: bugünün UTC+3 gece yarısı → UTC'ye çevrilmiş."""
+    from app.routers.api import _period_start_iso, TZ_TR
+    now_local = datetime(2026, 4, 2, 14, 30, 0, tzinfo=TZ_TR)
+    result = _period_start_iso(now_local, "day")
+    # 2026-04-02 00:00 UTC+3 = 2026-04-01 21:00 UTC
+    assert result == "2026-04-01T21:00:00+00:00"
+
+
+def test_period_start_iso_month():
+    from app.routers.api import _period_start_iso, TZ_TR
+    now_local = datetime(2026, 4, 15, 10, 0, 0, tzinfo=TZ_TR)
+    result = _period_start_iso(now_local, "month")
+    # 2026-04-01 00:00 UTC+3 = 2026-03-31 21:00 UTC
+    assert result == "2026-03-31T21:00:00+00:00"
+
+
+def test_period_start_iso_quarter_q2():
+    """Nisan Q2'de (Nis-Haz), başlangıç Nisan 1."""
+    from app.routers.api import _period_start_iso, TZ_TR
+    now_local = datetime(2026, 5, 20, 10, 0, 0, tzinfo=TZ_TR)
+    result = _period_start_iso(now_local, "quarter")
+    # 2026-04-01 00:00 UTC+3 = 2026-03-31 21:00 UTC
+    assert result == "2026-03-31T21:00:00+00:00"
+
+
+def test_period_start_iso_quarter_q1():
+    """Ocak Q1'de (Oca-Mar), başlangıç Ocak 1."""
+    from app.routers.api import _period_start_iso, TZ_TR
+    now_local = datetime(2026, 2, 10, 10, 0, 0, tzinfo=TZ_TR)
+    result = _period_start_iso(now_local, "quarter")
+    # 2026-01-01 00:00 UTC+3 = 2025-12-31 21:00 UTC
+    assert result == "2025-12-31T21:00:00+00:00"
+
+
+def test_period_start_iso_half_year_h2():
+    """Temmuz–Aralık H2, başlangıç Temmuz 1."""
+    from app.routers.api import _period_start_iso, TZ_TR
+    now_local = datetime(2026, 9, 1, 10, 0, 0, tzinfo=TZ_TR)
+    result = _period_start_iso(now_local, "half_year")
+    # 2026-07-01 00:00 UTC+3 = 2026-06-30 21:00 UTC
+    assert result == "2026-06-30T21:00:00+00:00"
+
+
+def test_period_start_iso_year():
+    from app.routers.api import _period_start_iso, TZ_TR
+    now_local = datetime(2026, 4, 2, 10, 0, 0, tzinfo=TZ_TR)
+    result = _period_start_iso(now_local, "year")
+    # 2026-01-01 00:00 UTC+3 = 2025-12-31 21:00 UTC
+    assert result == "2025-12-31T21:00:00+00:00"
+
+
+@pytest.mark.asyncio
+async def test_calc_period_dose_empty(test_db_path):
+    """Veri yoksa 0.0 döndürmeli."""
+    from app.routers.api import _calc_period_dose
+    db = Database(test_db_path)
+    await db.init()
+    result = await _calc_period_dose(db, "2026-01-01T00:00:00+00:00")
+    assert result == 0.0
+    await db.close()
+
+
+@pytest.mark.asyncio
+async def test_calc_period_dose_with_data(test_db_path):
+    """İlk ve son cumulative_dose farkını hesaplamalı."""
+    from app.routers.api import _calc_period_dose
+    db = Database(test_db_path)
+    await db.init()
+    await db.execute(
+        "INSERT INTO readings (timestamp, dose_rate, cumulative_dose) VALUES (?, ?, ?)",
+        ("2026-04-01T22:00:00+00:00", 0.10, 100.0),
+    )
+    await db.execute(
+        "INSERT INTO readings (timestamp, dose_rate, cumulative_dose) VALUES (?, ?, ?)",
+        ("2026-04-02T08:00:00+00:00", 0.12, 115.5),
+    )
+    result = await _calc_period_dose(db, "2026-04-01T21:00:00+00:00")
+    assert result == 15.5
+    await db.close()
+
+
+@pytest.mark.asyncio
+async def test_get_period_doses_returns_all_keys(seeded_db):
+    """Endpoint tüm periyot anahtarlarını döndürmeli."""
+    from app.routers.api import get_period_doses
+    db, config = seeded_db
+    request = MagicMock()
+    request.app.state.db = db
+    result = await get_period_doses(request)
+    assert set(result.keys()) == {"daily", "monthly", "quarterly", "half_yearly", "yearly"}
+    for v in result.values():
+        assert isinstance(v, float)
