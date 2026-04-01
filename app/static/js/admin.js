@@ -1,5 +1,34 @@
 "use strict";
 
+// --- Sidebar Navigation ---
+
+const sidebarLinks = document.querySelectorAll(".sidebar-link");
+const sections = document.querySelectorAll(".admin-section");
+
+function showSection(name) {
+    sections.forEach(s => s.classList.remove("active"));
+    sidebarLinks.forEach(l => l.classList.remove("active"));
+    const target = document.getElementById("sec-" + name);
+    const link = document.querySelector(`.sidebar-link[data-section="${name}"]`);
+    if (target) target.classList.add("active");
+    if (link) link.classList.add("active");
+    // URL hash update (geri tuşu desteği)
+    history.replaceState(null, "", "#" + name);
+}
+
+sidebarLinks.forEach(link => {
+    link.addEventListener("click", (e) => {
+        e.preventDefault();
+        showSection(link.dataset.section);
+    });
+});
+
+// Hash'ten bölüm aç
+const initSection = location.hash.replace("#", "") || "sampling";
+showSection(initSection);
+
+// --- Settings ---
+
 const FIELDS = [
     "sampling_interval", "threshold_high", "threshold_high_high",
     "alarm_high_actions", "alarm_high_high_actions",
@@ -15,7 +44,6 @@ async function loadSettings() {
     try {
         const res = await fetch("/api/settings");
         const settings = await res.json();
-
         FIELDS.forEach(key => {
             const el = document.getElementById(key);
             if (!el) return;
@@ -26,11 +54,11 @@ async function loadSettings() {
             }
         });
     } catch (e) {
-        console.error("Ayarlar yüklenemedi:", e);
+        console.error("Ayarlar yuklenemedi:", e);
     }
 }
 
-async function saveSettings() {
+async function saveSettings(msgEl) {
     const payload = {};
     FIELDS.forEach(key => {
         const el = document.getElementById(key);
@@ -48,15 +76,29 @@ async function saveSettings() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
         });
-        if (res.ok) {
-            const msg = document.getElementById("saveMsg");
-            msg.style.display = "block";
-            setTimeout(() => { msg.style.display = "none"; }, 3000);
+        if (res.ok && msgEl) {
+            msgEl.classList.add("show");
+            setTimeout(() => msgEl.classList.remove("show"), 3000);
         }
     } catch (e) {
         console.error("Ayarlar kaydedilemedi:", e);
     }
 }
+
+// Ana kaydet butonu (Örnekleme bölümündeki)
+document.getElementById("saveBtn").addEventListener("click", () => {
+    saveSettings(document.getElementById("saveMsg"));
+});
+
+// Her bölümdeki kaydet butonları
+document.querySelectorAll(".save-section-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+        const msg = btn.parentElement.querySelector(".save-section-msg");
+        saveSettings(msg);
+    });
+});
+
+// --- Alarm History ---
 
 async function loadAlarmHistory() {
     try {
@@ -73,17 +115,15 @@ async function loadAlarmHistory() {
         alarms.forEach(a => {
             const d = new Date(a.timestamp);
             const timeStr = d.toLocaleString("tr-TR");
-            const levelStr = a.level === "high_high" ? "KRİTİK" : "UYARI";
+            const levelStr = a.level === "high_high" ? "KRITIK" : "UYARI";
             const row = document.createElement("tr");
-            row.innerHTML = `<td>${timeStr}</td><td>${levelStr}</td><td>${a.dose_rate.toFixed(3)} µSv/h</td><td>${a.action_taken}</td>`;
+            row.innerHTML = `<td>${timeStr}</td><td>${levelStr}</td><td>${a.dose_rate.toFixed(3)} uSv/h</td><td>${a.action_taken}</td>`;
             tbody.appendChild(row);
         });
     } catch (e) {
-        console.error("Alarm geçmişi yüklenemedi:", e);
+        console.error("Alarm gecmisi yuklenemedi:", e);
     }
 }
-
-document.getElementById("saveBtn").addEventListener("click", saveSettings);
 
 // --- WiFi ---
 
@@ -100,7 +140,7 @@ async function loadWifiStatus() {
         const dot = s.mode !== "unknown"
             ? '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin-right:0.4rem;"></span>'
             : '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--red);margin-right:0.4rem;"></span>';
-        wifiStatusEl.innerHTML = `${dot}<strong>${modeText}</strong> &mdash; SSID: <strong>${s.ssid || "—"}</strong> &mdash; IP: <strong>${s.ip || "—"}</strong>`;
+        wifiStatusEl.innerHTML = `${dot}<strong>${modeText}</strong> &mdash; SSID: <strong>${s.ssid || "\u2014"}</strong> &mdash; IP: <strong>${s.ip || "\u2014"}</strong>`;
     } catch (e) {
         wifiStatusEl.innerHTML = '<span style="color:var(--red)">WiFi durumu alinamadi</span>';
     }
@@ -122,7 +162,7 @@ async function scanNetworks() {
             const item = document.createElement("div");
             item.style.cssText = "display:flex;justify-content:space-between;align-items:center;padding:0.4rem 0.6rem;background:var(--bg);border-radius:4px;cursor:pointer;font-size:0.85rem;";
             const signal = n.signal >= 70 ? "var(--green)" : n.signal >= 40 ? "var(--yellow)" : "var(--red)";
-            item.innerHTML = `<span>${n.ssid}</span><span style="color:${signal}">${n.signal}% ${n.security ? "&#x1f512;" : ""}</span>`;
+            item.innerHTML = `<span>${n.ssid}</span><span style="color:${signal}">${n.signal}%${n.security ? " &#x1f512;" : ""}</span>`;
             item.addEventListener("click", () => {
                 document.getElementById("wifiSsid").value = n.ssid;
                 document.getElementById("wifiPass").value = "";
@@ -187,6 +227,8 @@ document.getElementById("apStartBtn").addEventListener("click", async () => {
         msgEl.textContent = "AP baslatma hatasi"; msgEl.style.color = "var(--red)";
     }
 });
+
+// --- Init ---
 
 loadSettings();
 loadAlarmHistory();

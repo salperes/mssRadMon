@@ -2,186 +2,218 @@
 {% block title %}Yönetim — mssRadMon{% endblock %}
 
 {% block content %}
-<h2 style="margin-bottom: 1rem;">Yönetim Paneli</h2>
+<div class="admin-layout">
+    <aside class="admin-sidebar">
+        <nav class="sidebar-nav">
+            <a href="#" class="sidebar-link active" data-section="sampling">Örnekleme</a>
+            <a href="#" class="sidebar-link" data-section="alarm">Alarm & GPIO</a>
+            <a href="#" class="sidebar-link" data-section="email">E-posta</a>
+            <a href="#" class="sidebar-link" data-section="remotelog">Uzak Log</a>
+            <a href="#" class="sidebar-link" data-section="wifi">WiFi</a>
+            <a href="#" class="sidebar-link" data-section="history">Alarm Geçmişi</a>
+        </nav>
+    </aside>
 
-<div class="card">
-    <div class="card-title">Örnekleme</div>
-    <div class="form-group">
-        <label for="sampling_interval">Örnekleme Aralığı (saniye)</label>
-        <input type="number" id="sampling_interval" min="1" max="3600">
-    </div>
-</div>
+    <div class="admin-content">
+        <!-- Örnekleme -->
+        <section class="admin-section active" id="sec-sampling">
+            <h2 class="section-title">Örnekleme</h2>
+            <div class="card">
+                <div class="form-group">
+                    <label for="sampling_interval">Örnekleme Aralığı (saniye)</label>
+                    <input type="number" id="sampling_interval" min="1" max="3600">
+                </div>
+            </div>
+            <button class="btn" id="saveBtn">Ayarları Kaydet</button>
+            <span id="saveMsg" class="save-msg">Ayarlar kaydedildi.</span>
+        </section>
 
-<div class="card">
-    <div class="card-title">Alarm Eşik Değerleri</div>
-    <div class="dashboard-grid">
-        <div class="form-group">
-            <label for="threshold_high">High Eşiği (µSv/h)</label>
-            <input type="number" id="threshold_high" step="0.01" min="0">
-        </div>
-        <div class="form-group">
-            <label for="threshold_high_high">High-High Eşiği (µSv/h)</label>
-            <input type="number" id="threshold_high_high" step="0.01" min="0">
-        </div>
-    </div>
-    <div class="dashboard-grid">
-        <div class="form-group">
-            <label for="alarm_high_actions">High Aksiyonları</label>
-            <input type="text" id="alarm_high_actions" placeholder="buzzer,light">
-        </div>
-        <div class="form-group">
-            <label for="alarm_high_high_actions">High-High Aksiyonları</label>
-            <input type="text" id="alarm_high_high_actions" placeholder="buzzer,light,emergency">
-        </div>
-    </div>
-</div>
+        <!-- Alarm & GPIO -->
+        <section class="admin-section" id="sec-alarm">
+            <h2 class="section-title">Alarm & GPIO</h2>
+            <div class="card">
+                <div class="card-title">Eşik Değerleri</div>
+                <div class="dashboard-grid">
+                    <div class="form-group">
+                        <label for="threshold_high">High Eşiği (µSv/h)</label>
+                        <input type="number" id="threshold_high" step="0.01" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="threshold_high_high">High-High Eşiği (µSv/h)</label>
+                        <input type="number" id="threshold_high_high" step="0.01" min="0">
+                    </div>
+                </div>
+                <div class="dashboard-grid">
+                    <div class="form-group">
+                        <label for="alarm_high_actions">High Aksiyonları</label>
+                        <input type="text" id="alarm_high_actions" placeholder="buzzer,light">
+                    </div>
+                    <div class="form-group">
+                        <label for="alarm_high_high_actions">High-High Aksiyonları</label>
+                        <input type="text" id="alarm_high_high_actions" placeholder="buzzer,light,emergency">
+                    </div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-title">GPIO Pin Ayarları</div>
+                <div class="dashboard-grid">
+                    <div class="form-group">
+                        <label for="gpio_buzzer_pin">Buzzer Pin</label>
+                        <input type="number" id="gpio_buzzer_pin" min="0" max="40">
+                    </div>
+                    <div class="form-group">
+                        <label for="gpio_light_pin">Işık Pin</label>
+                        <input type="number" id="gpio_light_pin" min="0" max="40">
+                    </div>
+                </div>
+                <div class="form-group" style="max-width:calc(50% - 0.5rem);">
+                    <label for="gpio_emergency_pin">Acil Kapatma Pin</label>
+                    <input type="number" id="gpio_emergency_pin" min="0" max="40">
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-title">Buzzer</div>
+                <div class="form-group">
+                    <label>
+                        <span class="toggle">
+                            <input type="checkbox" id="alarm_buzzer_enabled">
+                            <span class="slider"></span>
+                        </span>
+                        Buzzer Aktif
+                    </label>
+                </div>
+            </div>
+            <button class="btn save-section-btn">Ayarları Kaydet</button>
+            <span class="save-msg save-section-msg">Ayarlar kaydedildi.</span>
+        </section>
 
-<div class="card">
-    <div class="card-title">GPIO Pin Ayarları</div>
-    <div class="dashboard-grid">
-        <div class="form-group">
-            <label for="gpio_buzzer_pin">Buzzer Pin</label>
-            <input type="number" id="gpio_buzzer_pin" min="0" max="40">
-        </div>
-        <div class="form-group">
-            <label for="gpio_light_pin">Işık Pin</label>
-            <input type="number" id="gpio_light_pin" min="0" max="40">
-        </div>
-    </div>
-    <div class="form-group" style="max-width:calc(50% - 0.5rem);">
-        <label for="gpio_emergency_pin">Acil Kapatma Pin</label>
-        <input type="number" id="gpio_emergency_pin" min="0" max="40">
-    </div>
-</div>
+        <!-- E-posta -->
+        <section class="admin-section" id="sec-email">
+            <h2 class="section-title">E-posta Bildirimi</h2>
+            <div class="card">
+                <div class="form-group">
+                    <label>
+                        <span class="toggle">
+                            <input type="checkbox" id="alarm_email_enabled">
+                            <span class="slider"></span>
+                        </span>
+                        E-posta Bildirimi Aktif
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label for="alarm_email_to">Alıcı Adresi</label>
+                    <input type="email" id="alarm_email_to">
+                </div>
+                <div class="dashboard-grid">
+                    <div class="form-group">
+                        <label for="smtp_host">SMTP Sunucu</label>
+                        <input type="text" id="smtp_host">
+                    </div>
+                    <div class="form-group">
+                        <label for="smtp_port">SMTP Port</label>
+                        <input type="number" id="smtp_port">
+                    </div>
+                </div>
+                <div class="dashboard-grid">
+                    <div class="form-group">
+                        <label for="smtp_user">SMTP Kullanıcı</label>
+                        <input type="text" id="smtp_user">
+                    </div>
+                    <div class="form-group">
+                        <label for="smtp_pass">SMTP Şifre</label>
+                        <input type="password" id="smtp_pass">
+                    </div>
+                </div>
+            </div>
+            <button class="btn save-section-btn">Ayarları Kaydet</button>
+            <span class="save-msg save-section-msg">Ayarlar kaydedildi.</span>
+        </section>
 
-<div class="card">
-    <div class="card-title">Buzzer Ayarı</div>
-    <div class="form-group">
-        <label>
-            <span class="toggle">
-                <input type="checkbox" id="alarm_buzzer_enabled">
-                <span class="slider"></span>
-            </span>
-            Buzzer Aktif
-        </label>
-    </div>
-</div>
+        <!-- Uzak Log -->
+        <section class="admin-section" id="sec-remotelog">
+            <h2 class="section-title">Uzak Log Sunucusu</h2>
+            <div class="card">
+                <div class="form-group">
+                    <label>
+                        <span class="toggle">
+                            <input type="checkbox" id="remote_log_enabled">
+                            <span class="slider"></span>
+                        </span>
+                        Uzak Log Aktif
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label for="remote_log_url">Endpoint URL</label>
+                    <input type="url" id="remote_log_url">
+                </div>
+                <div class="form-group">
+                    <label for="remote_log_api_key">API Anahtarı</label>
+                    <input type="text" id="remote_log_api_key">
+                </div>
+            </div>
+            <button class="btn save-section-btn">Ayarları Kaydet</button>
+            <span class="save-msg save-section-msg">Ayarlar kaydedildi.</span>
+        </section>
 
-<div class="card">
-    <div class="card-title">E-posta Bildirimi</div>
-    <div class="form-group">
-        <label>
-            <span class="toggle">
-                <input type="checkbox" id="alarm_email_enabled">
-                <span class="slider"></span>
-            </span>
-            E-posta Bildirimi Aktif
-        </label>
-    </div>
-    <div class="form-group">
-        <label for="alarm_email_to">Alıcı Adresi</label>
-        <input type="email" id="alarm_email_to">
-    </div>
-    <div class="dashboard-grid">
-        <div class="form-group">
-            <label for="smtp_host">SMTP Sunucu</label>
-            <input type="text" id="smtp_host">
-        </div>
-        <div class="form-group">
-            <label for="smtp_port">SMTP Port</label>
-            <input type="number" id="smtp_port">
-        </div>
-    </div>
-    <div class="dashboard-grid">
-        <div class="form-group">
-            <label for="smtp_user">SMTP Kullanıcı</label>
-            <input type="text" id="smtp_user">
-        </div>
-        <div class="form-group">
-            <label for="smtp_pass">SMTP Şifre</label>
-            <input type="password" id="smtp_pass">
-        </div>
-    </div>
-</div>
+        <!-- WiFi -->
+        <section class="admin-section" id="sec-wifi">
+            <h2 class="section-title">WiFi Ayarları</h2>
+            <div class="card">
+                <div class="wifi-status" id="wifiStatus" style="margin-bottom: 1rem; padding: 0.75rem; background: var(--surface); border-radius: 8px;">
+                    <span style="color: var(--text-dim);">Yükleniyor...</span>
+                </div>
 
-<div class="card">
-    <div class="card-title">Uzak Log Sunucusu</div>
-    <div class="form-group">
-        <label>
-            <span class="toggle">
-                <input type="checkbox" id="remote_log_enabled">
-                <span class="slider"></span>
-            </span>
-            Uzak Log Aktif
-        </label>
-    </div>
-    <div class="form-group">
-        <label for="remote_log_url">Endpoint URL</label>
-        <input type="url" id="remote_log_url">
-    </div>
-    <div class="form-group">
-        <label for="remote_log_api_key">API Anahtarı</label>
-        <input type="text" id="remote_log_api_key">
-    </div>
-</div>
+                <div class="dashboard-grid" style="margin-bottom: 1rem;">
+                    <button class="btn" id="wifiClientBtn" style="width:100%">Client Modu</button>
+                    <button class="btn" id="wifiApBtn" style="width:100%; background: var(--yellow); color: #1a1a2e;">AP Modu</button>
+                </div>
 
-<button class="btn" id="saveBtn" style="margin-bottom: 1rem;">Ayarları Kaydet</button>
-<div id="saveMsg" style="margin-top: 0.5rem; font-size: 0.85rem; color: var(--green); display: none;">Ayarlar kaydedildi.</div>
+                <div id="clientPanel" style="display:none;">
+                    <div class="card-title" style="margin-top: 0.5rem;">Ağ Seç</div>
+                    <div id="wifiNetworks" style="margin-bottom: 0.75rem; color: var(--text-dim); font-size: 0.85rem;">
+                        Taranıyor...
+                    </div>
+                    <div class="form-group">
+                        <label for="wifiSsid">SSID</label>
+                        <input type="text" id="wifiSsid" placeholder="Ağ adı">
+                    </div>
+                    <div class="form-group">
+                        <label for="wifiPass">Şifre</label>
+                        <input type="password" id="wifiPass">
+                    </div>
+                    <button class="btn" id="wifiConnectBtn">Bağlan</button>
+                    <span id="wifiClientMsg" style="margin-left: 0.75rem; font-size: 0.85rem;"></span>
+                </div>
 
-<div class="card" style="margin-top: 2rem;">
-    <div class="card-title">WiFi Ayarları</div>
+                <div id="apPanel" style="display:none;">
+                    <div class="form-group">
+                        <label for="apSsid">AP SSID</label>
+                        <input type="text" id="apSsid" placeholder="mssRadMon" value="mssRadMon">
+                    </div>
+                    <div class="form-group">
+                        <label for="apPass">AP Şifre (min 8 karakter)</label>
+                        <input type="password" id="apPass" placeholder="radmon2026" value="radmon2026">
+                    </div>
+                    <button class="btn" id="apStartBtn" style="background: var(--yellow); color: #1a1a2e;">AP Başlat</button>
+                    <span id="wifiApMsg" style="margin-left: 0.75rem; font-size: 0.85rem;"></span>
+                </div>
+            </div>
+        </section>
 
-    <div class="wifi-status" id="wifiStatus" style="margin-bottom: 1rem; padding: 0.75rem; background: var(--surface); border-radius: 8px;">
-        <span style="color: var(--text-dim);">Yükleniyor...</span>
+        <!-- Alarm Geçmişi -->
+        <section class="admin-section" id="sec-history">
+            <h2 class="section-title">Alarm Geçmişi</h2>
+            <div class="card">
+                <table class="alarm-table">
+                    <thead>
+                        <tr><th>Zaman</th><th>Seviye</th><th>Doz Hızı</th><th>Aksiyonlar</th></tr>
+                    </thead>
+                    <tbody id="alarmTableBody">
+                    </tbody>
+                </table>
+            </div>
+        </section>
     </div>
-
-    <div class="dashboard-grid" style="margin-bottom: 1rem;">
-        <button class="btn" id="wifiClientBtn" style="width:100%">Client Modu</button>
-        <button class="btn" id="wifiApBtn" style="width:100%; background: var(--yellow); color: #1a1a2e;">AP Modu</button>
-    </div>
-
-    <!-- Client Mode Panel -->
-    <div id="clientPanel" style="display:none;">
-        <div class="card-title" style="margin-top: 0.5rem;">Ağ Seç</div>
-        <div id="wifiNetworks" style="margin-bottom: 0.75rem; color: var(--text-dim); font-size: 0.85rem;">
-            Taranıyor...
-        </div>
-        <div class="form-group">
-            <label for="wifiSsid">SSID</label>
-            <input type="text" id="wifiSsid" placeholder="Ağ adı">
-        </div>
-        <div class="form-group">
-            <label for="wifiPass">Şifre</label>
-            <input type="password" id="wifiPass">
-        </div>
-        <button class="btn" id="wifiConnectBtn">Bağlan</button>
-        <span id="wifiClientMsg" style="margin-left: 0.75rem; font-size: 0.85rem;"></span>
-    </div>
-
-    <!-- AP Mode Panel -->
-    <div id="apPanel" style="display:none;">
-        <div class="form-group">
-            <label for="apSsid">AP SSID</label>
-            <input type="text" id="apSsid" placeholder="mssRadMon" value="mssRadMon">
-        </div>
-        <div class="form-group">
-            <label for="apPass">AP Şifre (min 8 karakter)</label>
-            <input type="password" id="apPass" placeholder="radmon2026" value="radmon2026">
-        </div>
-        <button class="btn" id="apStartBtn" style="background: var(--yellow); color: #1a1a2e;">AP Başlat</button>
-        <span id="wifiApMsg" style="margin-left: 0.75rem; font-size: 0.85rem;"></span>
-    </div>
-</div>
-
-<div class="card" style="margin-top: 1rem;">
-    <div class="card-title">Alarm Geçmişi (Son 24 Saat)</div>
-    <table class="alarm-table">
-        <thead>
-            <tr><th>Zaman</th><th>Seviye</th><th>Doz Hızı</th><th>Aksiyonlar</th></tr>
-        </thead>
-        <tbody id="alarmTableBody">
-        </tbody>
-    </table>
 </div>
 {% endblock %}
 
