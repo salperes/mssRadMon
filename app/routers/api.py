@@ -3,6 +3,8 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Request
 
+from app.__version__ import __version__
+
 router = APIRouter(prefix="/api", tags=["api"])
 
 DURATION_MAP = {
@@ -71,6 +73,12 @@ async def get_daily_dose(request: Request):
     return {"date": today_start[:10], "daily_dose": daily}
 
 
+@router.get("/health")
+async def get_health():
+    """Uygulama sağlık ve versiyon bilgisi."""
+    return {"status": "ok", "version": __version__}
+
+
 @router.get("/status")
 async def get_status(request: Request):
     """Cihaz ve uygulama durumunu döndür."""
@@ -78,6 +86,7 @@ async def get_status(request: Request):
     return {
         "connected": reader.connected,
         "port": reader.port,
+        "version": __version__,
     }
 
 

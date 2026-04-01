@@ -1,15 +1,17 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 :root {
-    --bg: #1a1a2e;
-    --surface: #16213e;
-    --card: #0f3460;
-    --text: #e0e0e0;
-    --text-dim: #a0a0a0;
-    --green: #00c853;
-    --yellow: #ffd600;
-    --red: #ff1744;
-    --accent: #00bcd4;
+    --bg: #f0f4f8;
+    --surface: #ffffff;
+    --card: #ffffff;
+    --text: #1e293b;
+    --text-dim: #64748b;
+    --green: #16a34a;
+    --yellow: #d97706;
+    --red: #dc2626;
+    --accent: #0891b2;
+    --border: rgba(0,0,0,0.1);
+    --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.05);
 }
 
 body {
@@ -26,7 +28,8 @@ body {
     justify-content: space-between;
     padding: 0.75rem 1.5rem;
     background: var(--surface);
-    border-bottom: 1px solid rgba(255,255,255,0.1);
+    border-bottom: 1px solid var(--border);
+    box-shadow: var(--shadow);
 }
 .nav-brand { font-size: 1.25rem; font-weight: 700; color: var(--accent); }
 .nav-links a {
@@ -47,14 +50,16 @@ body {
     border-radius: 12px;
     padding: 1.5rem;
     margin-bottom: 1rem;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border);
 }
 .card-title { font-size: 0.85rem; color: var(--text-dim); margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em; }
 
 /* Range select */
 .range-select {
-    background: var(--surface);
+    background: var(--bg);
     color: var(--text);
-    border: 1px solid rgba(255,255,255,0.15);
+    border: 1px solid var(--border);
     border-radius: 4px;
     padding: 0.15rem 0.4rem;
     font-size: 0.8rem;
@@ -112,6 +117,7 @@ body {
 
 /* Chart container */
 .chart-container { position: relative; width: 100%; height: 250px; }
+.chart-hint { font-size: 0.72rem; color: var(--text-dim); text-align: right; margin-top: 4px; opacity: 0.7; user-select: none; }
 
 /* Daily dose */
 .daily-dose-value { font-size: 2rem; font-weight: 600; }
@@ -125,8 +131,8 @@ body {
     display: none;
 }
 .alarm-banner.active { display: block; }
-.alarm-banner.high { background: rgba(255,214,0,0.15); border: 1px solid var(--yellow); color: var(--yellow); }
-.alarm-banner.high_high { background: rgba(255,23,68,0.15); border: 1px solid var(--red); color: var(--red); }
+.alarm-banner.high { background: rgba(217,119,6,0.1); border: 1px solid var(--yellow); color: var(--yellow); }
+.alarm-banner.high_high { background: rgba(220,38,38,0.1); border: 1px solid var(--red); color: var(--red); }
 
 /* Admin form */
 .form-group { margin-bottom: 1rem; }
@@ -135,7 +141,7 @@ body {
     width: 100%;
     padding: 0.5rem 0.75rem;
     background: var(--surface);
-    border: 1px solid rgba(255,255,255,0.15);
+    border: 1px solid var(--border);
     border-radius: 6px;
     color: var(--text);
     font-size: 0.9rem;
@@ -156,7 +162,7 @@ body {
 
 /* Alarm history table */
 .alarm-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-.alarm-table th, .alarm-table td { padding: 0.5rem; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.08); }
+.alarm-table th, .alarm-table td { padding: 0.5rem; text-align: left; border-bottom: 1px solid var(--border); }
 .alarm-table th { color: var(--text-dim); font-weight: 500; }
 
 /* Toggle switch */
@@ -164,7 +170,7 @@ body {
 .toggle input { opacity: 0; width: 0; height: 0; }
 .toggle .slider {
     position: absolute; inset: 0;
-    background: rgba(255,255,255,0.15);
+    background: rgba(0,0,0,0.15);
     border-radius: 24px;
     cursor: pointer;
     transition: 0.2s;
@@ -201,6 +207,8 @@ body {
     background: var(--surface);
     border-radius: 12px;
     padding: 0.5rem;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border);
 }
 .sidebar-link {
     display: block;
@@ -211,8 +219,8 @@ body {
     border-radius: 8px;
     transition: background 0.15s, color 0.15s;
 }
-.sidebar-link:hover { background: rgba(255,255,255,0.05); color: var(--text); }
-.sidebar-link.active { background: var(--card); color: var(--accent); font-weight: 600; }
+.sidebar-link:hover { background: rgba(0,0,0,0.04); color: var(--text); }
+.sidebar-link.active { background: var(--bg); color: var(--accent); font-weight: 600; }
 
 .admin-content { flex: 1; min-width: 0; }
 .admin-section { display: none; }
@@ -276,6 +284,8 @@ body {
     align-items: center;
     flex-wrap: wrap;
     gap: 0.5rem;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border);
 }
 .shift-card-info { flex: 1; min-width: 200px; }
 .shift-card-name { font-weight: 600; font-size: 1rem; margin-bottom: 0.25rem; }

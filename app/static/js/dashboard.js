@@ -39,12 +39,12 @@ const chart = new Chart(ctx, {
         maintainAspectRatio: false,
         scales: {
             x: {
-                ticks: { color: "#a0a0a0", maxTicksLimit: 12, font: { size: 11 } },
-                grid: { color: "rgba(255,255,255,0.05)" },
+                ticks: { color: "#64748b", maxTicksLimit: 12, font: { size: 11 } },
+                grid: { color: "rgba(0,0,0,0.06)" },
             },
             y: {
-                ticks: { color: "#a0a0a0", font: { size: 11 } },
-                grid: { color: "rgba(255,255,255,0.05)" },
+                ticks: { color: "#64748b", font: { size: 11 } },
+                grid: { color: "rgba(0,0,0,0.06)" },
                 beginAtZero: true,
             },
         },
@@ -56,15 +56,15 @@ const chart = new Chart(ctx, {
                         type: "line",
                         yMin: thresholdHigh,
                         yMax: thresholdHigh,
-                        borderColor: "#ffd600",
+                        borderColor: "#d97706",
                         borderWidth: 1.5,
                         borderDash: [6, 4],
                         label: {
                             display: true,
                             content: "High",
                             position: "start",
-                            backgroundColor: "rgba(255,214,0,0.2)",
-                            color: "#ffd600",
+                            backgroundColor: "rgba(217,119,6,0.1)",
+                            color: "#d97706",
                             font: { size: 10 },
                             padding: 3,
                         },
@@ -73,15 +73,15 @@ const chart = new Chart(ctx, {
                         type: "line",
                         yMin: thresholdHighHigh,
                         yMax: thresholdHighHigh,
-                        borderColor: "#ff1744",
+                        borderColor: "#dc2626",
                         borderWidth: 1.5,
                         borderDash: [6, 4],
                         label: {
                             display: true,
                             content: "High-High",
                             position: "start",
-                            backgroundColor: "rgba(255,23,68,0.2)",
-                            color: "#ff1744",
+                            backgroundColor: "rgba(220,38,38,0.1)",
+                            color: "#dc2626",
                             font: { size: 10 },
                             padding: 3,
                         },
@@ -167,6 +167,7 @@ function formatTime(isoStr) {
 }
 
 function setChartData(readings) {
+    chartInteraction.resetView();
     chart.data.labels = readings.map(r => formatTime(r.timestamp));
     chart.data.datasets[0].data = readings.map(r => r.dose_rate);
     chart.update();
@@ -298,3 +299,138 @@ setInterval(async () => {
 
 loadInitial();
 connectWS();
+
+// ---- Grafik etkileşimi: ROI zum (sol), pan (sağ), scroll zum, çift tık reset ----
+const chartInteraction = (() => {
+    const cv = document.getElementById("doseChart");
+    const container = cv.parentElement; // .chart-container (position:relative)
+
+    // Seçim kutusu overlay
+    const selBox = document.createElement("div");
+    selBox.style.cssText = "position:absolute;border:1px solid rgba(0,188,212,0.7);background:rgba(0,188,212,0.08);pointer-events:none;display:none;box-sizing:border-box;";
+    container.appendChild(selBox);
+
+    let drag = null; // { type:"zoom"|"pan", startX, viewStart, viewEnd }
+
+    function labelIndexAt(px) {
+        const scale = chart.scales.x;
+        if (!scale || !chart.data.labels.length) return 0;
+        const idx = Math.round(scale.getValueForPixel(px));
+        return Math.max(0, Math.min(idx, chart.data.labels.length - 1));
+    }
+
+    function currentViewIndices() {
+        const labels = chart.data.labels;
+        if (!labels.length) return [0, 0];
+        const minL = chart.options.scales.x.min;
+        const maxL = chart.options.scales.x.max;
+        const s = (minL !== undefined) ? labels.indexOf(minL) : 0;
+        const e = (maxL !== undefined) ? labels.indexOf(maxL) : labels.length - 1;
+        return [s < 0 ? 0 : s, e < 0 ? labels.length - 1 : e];
+    }
+
+    function applyView(s, e) {
+        const labels = chart.data.labels;
+        if (!labels.length) return;
+        s = Math.max(0, s);
+        e = Math.min(labels.length - 1, e);
+        if (e - s < 2) return;
+        chart.options.scales.x.min = labels[s];
+        chart.options.scales.x.max = labels[e];
+        chart.update("none");
+    }
+
+    function resetView() {
+        delete chart.options.scales.x.min;
+        delete chart.options.scales.x.max;
+        chart.update("none");
+    }
+
+    // Sol fare tuşu: ROI zum başlat
+    cv.addEventListener("mousedown", e => {
+        if (e.button === 0) {
+            drag = { type: "zoom", startX: e.offsetX };
+            cv.style.cursor = "crosshair";
+        } else if (e.button === 2) {
+            const [vs, ve] = currentViewIndices();
+            drag = { type: "pan", startX: e.offsetX, viewStart: vs, viewEnd: ve };
+            cv.style.cursor = "grabbing";
+        }
+    });
+
+    cv.addEventListener("mousemove", e => {
+        if (!drag) return;
+        const ca = chart.chartArea;
+        if (!ca) return;
+
+        if (drag.type === "zoom") {
+            const x1 = Math.max(ca.left, Math.min(drag.startX, e.offsetX));
+            const x2 = Math.min(ca.right, Math.max(drag.startX, e.offsetX));
+            if (x2 - x1 > 4) {
+                selBox.style.left   = x1 + "px";
+                selBox.style.top    = ca.top + "px";
+                selBox.style.width  = (x2 - x1) + "px";
+                selBox.style.height = (ca.bottom - ca.top) + "px";
+                selBox.style.display = "block";
+            }
+        } else if (drag.type === "pan") {
+            const dx = e.offsetX - drag.startX;
+            const { viewStart: vs, viewEnd: ve } = drag;
+            const viewLen = ve - vs || 1;
+            const chartW = ca.right - ca.left;
+            const delta = Math.round(-dx * viewLen / chartW);
+            applyView(vs + delta, ve + delta);
+        }
+    });
+
+    cv.addEventListener("mouseup", e => {
+        if (!drag) return;
+        if (drag.type === "zoom" && e.button === 0) {
+            selBox.style.display = "none";
+            const dx = Math.abs(e.offsetX - drag.startX);
+            if (dx > 10) {
+                applyView(
+                    labelIndexAt(Math.min(drag.startX, e.offsetX)),
+                    labelIndexAt(Math.max(drag.startX, e.offsetX))
+                );
+            }
+        }
+        drag = null;
+        cv.style.cursor = "";
+    });
+
+    cv.addEventListener("mouseleave", () => {
+        if (drag && drag.type === "zoom") selBox.style.display = "none";
+        drag = null;
+        cv.style.cursor = "";
+    });
+
+    // Scroll: zum in/out (imleç konumu merkez)
+    cv.addEventListener("wheel", e => {
+        e.preventDefault();
+        const ca = chart.chartArea;
+        if (!ca) return;
+        const [vs, ve] = currentViewIndices();
+        const viewLen = ve - vs || 1;
+        const factor = e.deltaY > 0 ? 1.25 : 0.8; // scroll aşağı = uzaklaş
+        const newLen = Math.round(viewLen * factor);
+        // İmleç hangi orana denk geliyor?
+        const ratio = Math.max(0, Math.min(1, (e.offsetX - ca.left) / (ca.right - ca.left)));
+        const pivot = vs + Math.round(ratio * viewLen);
+        const newStart = Math.round(pivot - ratio * newLen);
+        const newEnd   = newStart + newLen;
+        if (newLen >= chart.data.labels.length) {
+            resetView();
+        } else {
+            applyView(newStart, newEnd);
+        }
+    }, { passive: false });
+
+    // Çift tık: sıfırla
+    cv.addEventListener("dblclick", () => resetView());
+
+    // Sağ tık menüsünü engelle
+    cv.addEventListener("contextmenu", e => e.preventDefault());
+
+    return { resetView };
+})();
