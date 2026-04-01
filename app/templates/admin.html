@@ -10,6 +10,7 @@
             <a href="#" class="sidebar-link" data-section="sampling">Örnekleme</a>
             <a href="#" class="sidebar-link" data-section="alarm">Alarm & GPIO</a>
             <a href="#" class="sidebar-link" data-section="email">E-posta</a>
+            <a href="#" class="sidebar-link" data-section="msgservice">msgService</a>
             <a href="#" class="sidebar-link" data-section="remotelog">Uzak Log</a>
             <a href="#" class="sidebar-link" data-section="wifi">WiFi</a>
             <a href="#" class="sidebar-link" data-section="shifts">Vardiyalar</a>
@@ -183,6 +184,87 @@
                 <button class="btn" id="testEmailBtn" style="background: var(--surface); border: 1px solid var(--accent);">Test Maili Gönder</button>
                 <span id="testEmailMsg" style="font-size: 0.85rem;"></span>
             </div>
+        </section>
+
+        <!-- msgService -->
+        <section class="admin-section" id="sec-msgservice">
+            <h2 class="section-title">msgService Bildirimleri</h2>
+
+            <div class="card">
+                <div class="card-title">Genel Ayarlar</div>
+                <div class="dashboard-grid">
+                    <div class="form-group">
+                        <label for="msg_service_url">Servis URL</label>
+                        <input type="url" id="msg_service_url" placeholder="http://192.168.88.112:3501">
+                    </div>
+                    <div class="form-group">
+                        <label for="msg_service_api_key">API Key</label>
+                        <input type="text" id="msg_service_api_key" placeholder="pk_mssradmon_...">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="msg_service_reply_to">Reply-To (opsiyonel)</label>
+                    <input type="email" id="msg_service_reply_to" placeholder="noreply@msspektral.com">
+                </div>
+                <div class="dashboard-grid">
+                    <div class="form-group">
+                        <label>
+                            <span class="toggle">
+                                <input type="checkbox" id="msg_service_mail_enabled">
+                                <span class="slider"></span>
+                            </span>
+                            E-posta Bildirimi Aktif
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <span class="toggle">
+                                <input type="checkbox" id="msg_service_wa_enabled">
+                                <span class="slider"></span>
+                            </span>
+                            WhatsApp Bildirimi Aktif
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">HIGH Seviye Alıcılar</div>
+                <div class="form-group">
+                    <label for="msg_service_high_mail_to">E-posta Alıcıları (virgülle ayrılmış)</label>
+                    <input type="text" id="msg_service_high_mail_to" placeholder="a@msspektral.com, b@msspektral.com">
+                </div>
+                <div class="form-group">
+                    <label for="msg_service_high_wa_to">WhatsApp Numaraları (virgülle, E.164 formatsız)</label>
+                    <input type="text" id="msg_service_high_wa_to" placeholder="905551234567, 905559876543">
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">HIGH-HIGH Seviye Alıcılar</div>
+                <div class="form-group">
+                    <label for="msg_service_high_high_mail_to">E-posta Alıcıları (virgülle ayrılmış)</label>
+                    <input type="text" id="msg_service_high_high_mail_to" placeholder="a@msspektral.com, b@msspektral.com">
+                </div>
+                <div class="form-group">
+                    <label for="msg_service_high_high_wa_to">WhatsApp Numaraları (virgülle, E.164 formatsız)</label>
+                    <input type="text" id="msg_service_high_high_wa_to" placeholder="905551234567, 905559876543">
+                </div>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap; margin-bottom:1rem;">
+                <button class="btn save-section-btn">Ayarları Kaydet</button>
+                <span class="save-msg save-section-msg">Ayarlar kaydedildi.</span>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+                <button class="btn" id="msgHealthBtn" style="background:var(--surface);border:1px solid var(--accent);">Bağlantı Testi</button>
+                <button class="btn" id="msgTestMailHighBtn" style="background:var(--surface);border:1px solid rgba(255,255,255,0.15);">Test Mail (HIGH)</button>
+                <button class="btn" id="msgTestMailHHBtn" style="background:var(--surface);border:1px solid rgba(255,255,255,0.15);">Test Mail (HIGH-HIGH)</button>
+                <button class="btn" id="msgTestWaHighBtn" style="background:var(--surface);border:1px solid rgba(255,255,255,0.15);">Test WA (HIGH)</button>
+                <button class="btn" id="msgTestWaHHBtn" style="background:var(--surface);border:1px solid rgba(255,255,255,0.15);">Test WA (HIGH-HIGH)</button>
+            </div>
+            <div id="msgServiceResult" style="margin-top:0.75rem;font-size:0.85rem;min-height:1.2rem;"></div>
         </section>
 
         <!-- Uzak Log -->

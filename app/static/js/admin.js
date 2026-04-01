@@ -39,9 +39,16 @@ const FIELDS = [
     "alarm_buzzer_enabled", "alarm_email_enabled",
     "alarm_email_to", "smtp_host", "smtp_port", "smtp_user", "smtp_pass",
     "remote_log_enabled", "remote_log_url", "remote_log_api_key",
+    "msg_service_url", "msg_service_api_key", "msg_service_reply_to",
+    "msg_service_mail_enabled", "msg_service_wa_enabled",
+    "msg_service_high_mail_to", "msg_service_high_wa_to",
+    "msg_service_high_high_mail_to", "msg_service_high_high_wa_to",
 ];
 
-const TOGGLE_FIELDS = ["alarm_buzzer_enabled", "alarm_email_enabled", "remote_log_enabled"];
+const TOGGLE_FIELDS = [
+    "alarm_buzzer_enabled", "alarm_email_enabled", "remote_log_enabled",
+    "msg_service_mail_enabled", "msg_service_wa_enabled",
+];
 
 async function loadSettings() {
     try {
@@ -457,3 +464,49 @@ loadSettings();
 loadAlarmHistory();
 loadWifiStatus();
 loadShifts();
+
+// --- msgService ---
+
+async function msgServiceAction(endpoint, body, resultEl) {
+    resultEl.textContent = "İşleniyor...";
+    resultEl.style.color = "var(--text-dim)";
+    try {
+        const res = await fetch(endpoint, {
+            method: endpoint.includes("health") ? "GET" : "POST",
+            headers: { "Content-Type": "application/json" },
+            body: endpoint.includes("health") ? undefined : JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (data.ok) {
+            let msg = "Başarılı.";
+            if (data.version) msg = `Bağlantı OK — v${data.version} | smtp:${data.smtp || "?"} | wa:${data.whatsapp || "?"}`;
+            if (data.messageId) msg = `Gönderildi (ID: ${data.messageId})`;
+            if (data.sent !== undefined) msg = `Gönderildi: ${data.sent}/${data.total}`;
+            resultEl.textContent = msg;
+            resultEl.style.color = "var(--green)";
+        } else {
+            resultEl.textContent = `Hata: ${data.message || "Bilinmeyen hata"}`;
+            resultEl.style.color = "var(--red)";
+        }
+    } catch (e) {
+        resultEl.textContent = `İstek hatası: ${e.message}`;
+        resultEl.style.color = "var(--red)";
+    }
+}
+
+const _msgResult = () => document.getElementById("msgServiceResult");
+
+document.getElementById("msgHealthBtn").addEventListener("click", () =>
+    msgServiceAction("/api/msgservice/health", null, _msgResult()));
+
+document.getElementById("msgTestMailHighBtn").addEventListener("click", () =>
+    msgServiceAction("/api/msgservice/test-mail", { level: "high" }, _msgResult()));
+
+document.getElementById("msgTestMailHHBtn").addEventListener("click", () =>
+    msgServiceAction("/api/msgservice/test-mail", { level: "high_high" }, _msgResult()));
+
+document.getElementById("msgTestWaHighBtn").addEventListener("click", () =>
+    msgServiceAction("/api/msgservice/test-wa", { level: "high" }, _msgResult()));
+
+document.getElementById("msgTestWaHHBtn").addEventListener("click", () =>
+    msgServiceAction("/api/msgservice/test-wa", { level: "high_high" }, _msgResult()));
