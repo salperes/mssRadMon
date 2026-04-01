@@ -15,7 +15,7 @@
             <a href="/admin" class="{% if active == 'admin' %}active{% endif %}">Yönetim</a>
         </div>
     </nav>
-    <main class="container">
+    <main class="container {% block container_class %}{% endblock %}">
         {% block content %}{% endblock %}
     </main>
     {% block scripts %}{% endblock %}

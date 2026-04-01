@@ -39,7 +39,7 @@ body {
 
 /* Container */
 .container { max-width: 960px; margin: 0 auto; padding: 1.5rem; }
-.container:has(.admin-layout) { max-width: 1100px; }
+.container-wide { max-width: 1100px; }
 
 /* Cards */
 .card {
@@ -175,21 +175,24 @@ body {
 
 /* Admin sidebar layout */
 .admin-layout {
-    display: grid;
-    grid-template-columns: 200px 1fr;
+    display: flex;
     gap: 1.5rem;
     min-height: calc(100vh - 60px);
 }
 .admin-sidebar {
+    flex: 0 0 200px;
     position: sticky;
-    top: 0;
-    align-self: start;
+    top: 60px;
+    align-self: flex-start;
     padding-top: 0.5rem;
 }
 .sidebar-nav {
     display: flex;
     flex-direction: column;
     gap: 2px;
+    background: var(--surface);
+    border-radius: 12px;
+    padding: 0.5rem;
 }
 .sidebar-link {
     display: block;
@@ -203,7 +206,7 @@ body {
 .sidebar-link:hover { background: rgba(255,255,255,0.05); color: var(--text); }
 .sidebar-link.active { background: var(--card); color: var(--accent); font-weight: 600; }
 
-.admin-content { min-width: 0; }
+.admin-content { flex: 1; min-width: 0; }
 .admin-section { display: none; }
 .admin-section.active { display: block; }
 .section-title { font-size: 1.15rem; font-weight: 600; margin-bottom: 1rem; }
@@ -216,17 +219,19 @@ body {
 }
 .save-msg.show { display: inline; }
 
-@media (max-width: 700px) {
-    .admin-layout { grid-template-columns: 1fr; }
+@media (max-width: 600px) {
+    .admin-layout { flex-direction: column; gap: 0; }
     .admin-sidebar {
+        flex: none;
         position: static;
         padding-top: 0;
+        margin-bottom: 1rem;
     }
     .sidebar-nav {
         flex-direction: row;
         overflow-x: auto;
         gap: 0.25rem;
-        padding-bottom: 0.5rem;
+        padding: 0.35rem;
     }
     .sidebar-link {
         white-space: nowrap;
