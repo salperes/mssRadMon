@@ -106,7 +106,7 @@ class AlarmManager:
         if email_enabled == "true":
             await self._send_email(level, dose_rate)
 
-        logger.warning("ALARM %s: %.3f uSv/h — aksiyonlar: %s", level.value, dose_rate, action_taken)
+        logger.warning("ALARM %s: %.3f µSv/h — aksiyonlar: %s", level.value, dose_rate, action_taken)
 
     async def _clear_alarm(self):
         """Aktif alarmi temizle, GPIO'lari kapat."""
@@ -146,13 +146,13 @@ class AlarmManager:
                 return
 
             msg = EmailMessage()
-            msg["Subject"] = f"[mssRadMon] ALARM {level.value.upper()}: {dose_rate:.3f} uSv/h"
+            msg["Subject"] = f"[mssRadMon] ALARM {level.value.upper()}: {dose_rate:.3f} µSv/h"
             msg["From"] = user
             msg["To"] = to_addr
             msg.set_content(
                 f"Radyasyon alarmi tetiklendi.\n\n"
                 f"Seviye: {level.value.upper()}\n"
-                f"Doz Hizi: {dose_rate:.3f} uSv/h\n"
+                f"Doz Hizi: {dose_rate:.3f} µSv/h\n"
                 f"Zaman: {datetime.now(timezone.utc).isoformat()}\n"
                 f"Cihaz: GSNJR400"
             )

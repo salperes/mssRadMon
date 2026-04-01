@@ -22,7 +22,7 @@ const chart = new Chart(ctx, {
     data: {
         labels: [],
         datasets: [{
-            label: "Doz Hizi (uSv/h)",
+            label: "Doz Hizi (µSv/h)",
             data: [],
             borderColor: "#00bcd4",
             backgroundColor: "rgba(0,188,212,0.1)",
@@ -184,7 +184,7 @@ async function loadInitial() {
             const last = alarms[0];
             alarmBanner.className = "alarm-banner active " + last.level;
             alarmLevel.textContent = last.level === "high_high" ? "KRITIK ALARM" : "UYARI";
-            alarmMsg.textContent = `${last.dose_rate.toFixed(3)} uSv/h - ${formatTime(last.timestamp)}`;
+            alarmMsg.textContent = `${last.dose_rate.toFixed(3)} µSv/h - ${formatTime(last.timestamp)}`;
         }
     } catch (e) {
         console.error("Baslangic verileri yuklenemedi:", e);

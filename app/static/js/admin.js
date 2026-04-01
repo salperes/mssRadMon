@@ -148,7 +148,7 @@ async function loadAlarmHistory() {
             const timeStr = d.toLocaleString("tr-TR");
             const levelStr = a.level === "high_high" ? "KRITIK" : "UYARI";
             const row = document.createElement("tr");
-            row.innerHTML = `<td>${timeStr}</td><td>${levelStr}</td><td>${a.dose_rate.toFixed(3)} uSv/h</td><td>${a.action_taken}</td>`;
+            row.innerHTML = `<td>${timeStr}</td><td>${levelStr}</td><td>${a.dose_rate.toFixed(3)} µSv/h</td><td>${a.action_taken}</td>`;
             tbody.appendChild(row);
         });
     } catch (e) {
