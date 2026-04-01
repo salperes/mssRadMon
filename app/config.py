@@ -7,6 +7,8 @@ DEFAULTS: dict[str, str] = {
     "sampling_interval": "10",
     "threshold_high": "0.5",
     "threshold_high_high": "1.0",
+    "threshold_high_duration": "120",
+    "threshold_high_high_duration": "15",
     "alarm_buzzer_enabled": "true",
     "alarm_email_enabled": "false",
     "alarm_email_to": "",
