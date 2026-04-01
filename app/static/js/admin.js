@@ -24,12 +24,13 @@ sidebarLinks.forEach(link => {
 });
 
 // Hash'ten bölüm aç
-const initSection = location.hash.replace("#", "") || "sampling";
+const initSection = location.hash.replace("#", "") || "device";
 showSection(initSection);
 
 // --- Settings ---
 
 const FIELDS = [
+    "device_name", "device_location",
     "sampling_interval", "threshold_high", "threshold_high_high",
     "alarm_high_actions", "alarm_high_high_actions",
     "gpio_buzzer_pin", "gpio_light_pin", "gpio_emergency_pin",

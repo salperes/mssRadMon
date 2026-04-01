@@ -6,7 +6,8 @@
 <div class="admin-layout">
     <aside class="admin-sidebar">
         <nav class="sidebar-nav">
-            <a href="#" class="sidebar-link active" data-section="sampling">Örnekleme</a>
+            <a href="#" class="sidebar-link active" data-section="device">Cihaz</a>
+            <a href="#" class="sidebar-link" data-section="sampling">Örnekleme</a>
             <a href="#" class="sidebar-link" data-section="alarm">Alarm & GPIO</a>
             <a href="#" class="sidebar-link" data-section="email">E-posta</a>
             <a href="#" class="sidebar-link" data-section="remotelog">Uzak Log</a>
@@ -16,8 +17,26 @@
     </aside>
 
     <div class="admin-content">
+        <!-- Cihaz -->
+        <section class="admin-section active" id="sec-device">
+            <h2 class="section-title">Cihaz Bilgileri</h2>
+            <div class="card">
+                <div class="form-group">
+                    <label for="device_name">Cihaz Adı</label>
+                    <input type="text" id="device_name" placeholder="GammaScout-01">
+                </div>
+                <div class="form-group">
+                    <label for="device_location">Lokasyon</label>
+                    <input type="text" id="device_location" placeholder="Bina A, 2. Kat, Oda 205">
+                </div>
+            </div>
+            <p style="font-size:0.8rem;color:var(--text-dim);margin-bottom:1rem;">Bu bilgiler uzak log sunucusuna her veri paketinde gönderilir.</p>
+            <button class="btn save-section-btn">Ayarları Kaydet</button>
+            <span class="save-msg save-section-msg">Ayarlar kaydedildi.</span>
+        </section>
+
         <!-- Örnekleme -->
-        <section class="admin-section active" id="sec-sampling">
+        <section class="admin-section" id="sec-sampling">
             <h2 class="section-title">Örnekleme</h2>
             <div class="card">
                 <div class="form-group">

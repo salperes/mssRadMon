@@ -6,7 +6,6 @@ import aiohttp
 
 logger = logging.getLogger(__name__)
 
-DEVICE_ID = "GSNJR400"
 BATCH_SIZE = 100
 RETRY_DELAYS = [5, 15, 45]
 
@@ -25,6 +24,11 @@ class RemoteLogForwarder:
     async def _get_api_key(self) -> str:
         return await self._config.get("remote_log_api_key") or ""
 
+    async def _device_info(self) -> dict:
+        name = await self._config.get("device_name") or "GammaScout-01"
+        location = await self._config.get("device_location") or ""
+        return {"device_name": name, "device_location": location}
+
     async def forward_reading(self, timestamp: str, dose_rate: float,
                                cumulative_dose: float, row_id: int):
         """Tek bir okumayı uzak sunucuya gönder."""
@@ -36,8 +40,9 @@ class RemoteLogForwarder:
         if not url:
             return
 
+        info = await self._device_info()
         payload = {
-            "device_id": DEVICE_ID,
+            **info,
             "timestamp": timestamp,
             "dose_rate": dose_rate,
             "cumulative_dose": cumulative_dose,
@@ -60,8 +65,9 @@ class RemoteLogForwarder:
         if not url:
             return
 
+        info = await self._device_info()
         payload = {
-            "device_id": DEVICE_ID,
+            **info,
             "timestamp": timestamp,
             "level": level,
             "dose_rate": dose_rate,
