@@ -291,3 +291,22 @@ body {
 .shift-card-name { font-weight: 600; font-size: 1rem; margin-bottom: 0.25rem; }
 .shift-card-detail { font-size: 0.85rem; color: var(--text-dim); }
 .shift-card-days { font-size: 0.8rem; color: var(--accent); margin-top: 0.2rem; }
+
+/* Period doses */
+.period-doses {
+    margin-top: 0.75rem;
+    padding-top: 0.6rem;
+    border-top: 1px solid var(--border);
+}
+.period-dose-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    padding: 0.1rem 0;
+    font-variant-numeric: tabular-nums;
+}
+.period-label {
+    font-weight: 500;
+}
