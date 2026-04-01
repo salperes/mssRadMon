@@ -266,13 +266,19 @@ async def _notify_ip(config, alarm_manager, ssid: str, ip: str):
         if not all([to_addr, host, user, password]):
             return
 
+        device_name = await config.get("device_name") or "GammaScout-01"
+        device_location = await config.get("device_location") or ""
+
         msg = EmailMessage()
-        msg["Subject"] = f"[mssRadMon] WiFi baglandi: {ssid} — {ip}"
+        msg["Subject"] = f"[{device_name}] WiFi bağlandı: {ssid} — {ip}"
         msg["From"] = user
         msg["To"] = to_addr
+        loc_line = f"Lokasyon: {device_location}\n" if device_location else ""
         msg.set_content(
-            f"mssRadMon WiFi baglandı.\n\n"
-            f"Ag: {ssid}\n"
+            f"{device_name} WiFi bağlandı.\n\n"
+            f"Cihaz: {device_name}\n"
+            f"{loc_line}"
+            f"Ağ: {ssid}\n"
             f"IP: {ip}\n"
             f"Zaman: {datetime.now(timezone.utc).isoformat()}\n"
         )
