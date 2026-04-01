@@ -27,6 +27,19 @@ CREATE TABLE IF NOT EXISTS alarm_log (
 );
 CREATE INDEX IF NOT EXISTS idx_alarm_ts ON alarm_log(timestamp);
 CREATE INDEX IF NOT EXISTS idx_alarm_sync ON alarm_log(remote_synced) WHERE remote_synced = 0;
+
+CREATE TABLE IF NOT EXISTS shift_doses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    shift_id TEXT NOT NULL,
+    shift_name TEXT NOT NULL,
+    date TEXT NOT NULL,
+    start_time TEXT NOT NULL,
+    end_time TEXT NOT NULL,
+    dose REAL NOT NULL DEFAULT 0.0,
+    completed INTEGER DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_shift_doses_date ON shift_doses(date);
+CREATE INDEX IF NOT EXISTS idx_shift_doses_active ON shift_doses(completed) WHERE completed = 0;
 """
 
 

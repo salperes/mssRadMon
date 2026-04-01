@@ -22,6 +22,7 @@ DEFAULTS: dict[str, str] = {
     "gpio_emergency_pin": "22",
     "alarm_high_actions": "buzzer,light",
     "alarm_high_high_actions": "buzzer,light,emergency",
+    "shifts": "[]",
 }
 
 
