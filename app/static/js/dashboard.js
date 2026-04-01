@@ -115,7 +115,7 @@ function updateDoseRate(value) {
 
 function updateConnection(connected) {
     connDot.className = connected ? "conn-dot connected" : "conn-dot";
-    connText.textContent = connected ? "Bagli" : "Baglanti yok";
+    connText.textContent = connected ? "Bağlı" : "Bağlantı yok";
 }
 
 function updateShift(active, name, dose) {
@@ -130,7 +130,7 @@ function updateShift(active, name, dose) {
 
 function updatePendingAlarm(pending, level, elapsed, duration) {
     if (pending) {
-        const levelText = level === "high_high" ? "KRITIK eşik aşıldı" : "HIGH eşiği aşıldı";
+        const levelText = level === "high_high" ? "KRİTİK eşik aşıldı" : "HIGH eşiği aşıldı";
         alarmBanner.className = "alarm-banner active " + (level === "high_high" ? "high_high" : "high");
         alarmLevel.textContent = "ÖN UYARI";
         alarmMsg.textContent = `${levelText} — ${elapsed}/${duration} sn`;
@@ -234,7 +234,7 @@ async function loadInitial() {
         if (alarms.length > 0) {
             const last = alarms[0];
             alarmBanner.className = "alarm-banner active " + last.level;
-            alarmLevel.textContent = last.level === "high_high" ? "KRITIK ALARM" : "UYARI";
+            alarmLevel.textContent = last.level === "high_high" ? "KRİTİK ALARM" : "UYARI";
             alarmMsg.textContent = `${last.dose_rate.toFixed(3)} µSv/h - ${formatTime(last.timestamp)}`;
         }
     } catch (e) {

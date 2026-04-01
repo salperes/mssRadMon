@@ -15,7 +15,7 @@ import serial
 logger = logging.getLogger(__name__)
 
 # Protokol sabitleri
-DEFAULT_PORT = "/dev/ttyUSB0"
+DEFAULT_PORT = "/dev/ttyGammaScout"
 DEFAULT_BAUDRATE = 460800
 BYTESIZE = serial.SEVENBITS
 PARITY = serial.PARITY_EVEN
@@ -60,6 +60,7 @@ class GammaScoutReader:
         self._cumulative_dose = 0.0
         self._device_info: DeviceInfo | None = None
         self._on_reading: Callable[[Reading], Awaitable[None]] | None = None
+        self.calibration_factor: float = 1.0
 
     @property
     def serial_number(self) -> str:
@@ -147,19 +148,27 @@ class GammaScoutReader:
     def _parse_version(self, raw: bytes) -> DeviceInfo | None:
         """PC mode 'v' komut yanıtını parse et.
 
-        Beklenen format (FW >= 6.90):
-        Version FW_VER CPU_VER SN USED_MEM DATE TIME
+        Gerçek format (FW >= 6.90):
+        Version FW_VER SN USED_MEM DATE TIME
+        Örnek: Version 7.14Lb07 085875 0030 d2.fc.cf 16:28:12
         """
         if not raw:
             return None
         try:
-            text = raw.decode("ascii", errors="ignore").strip()
-            if not text:
+            text = raw.decode("ascii", errors="ignore")
+            # Buffer'da kalan P yanıtı ile karışabilir; "Version" ile başlayan satırı bul
+            version_line = None
+            for line in text.splitlines():
+                if line.strip().startswith("Version"):
+                    version_line = line.strip()
+                    break
+            if not version_line:
+                logger.warning("Version satırı bulunamadı (raw: %s)", raw)
                 return None
-            parts = text.split()
-            # Minimum: version string ve serial
+            parts = version_line.split()
+            # parts[0]="Version" parts[1]=FW parts[2]=SN parts[3]=USED_MEM parts[4]=DATE parts[5]=TIME
             return DeviceInfo(
-                firmware=parts[0] if len(parts) > 0 else "unknown",
+                firmware=parts[1] if len(parts) > 1 else "unknown",
                 serial_number=parts[2] if len(parts) > 2 else "unknown",
                 used_memory=parts[3] if len(parts) > 3 else "unknown",
                 datetime_str=" ".join(parts[4:6]) if len(parts) > 5 else "unknown",
@@ -229,6 +238,7 @@ class GammaScoutReader:
             except serial.SerialException:
                 pass
         self._connected = False
+        self._device_info = None  # yeniden bağlanınca tam init yapılsın
         logger.info("GammaScout bağlantısı kapatıldı")
 
     async def run(self, interval: int = 10):
@@ -240,27 +250,30 @@ class GammaScoutReader:
         4. Callback ile bildir
         """
         self._running = True
+        _consecutive_failures = 0
         while self._running:
             if not self._connected:
                 logger.info("GammaScout'a bağlanılıyor...")
                 if not self.connect():
                     await asyncio.sleep(5)
                     continue
-                # İlk bağlantıda seri numarasını al
-                if not self._device_info:
-                    loop = asyncio.get_event_loop()
-                    self._device_info = await loop.run_in_executor(None, self._query_version)
-                    if self._device_info:
-                        logger.info("GammaScout FW:%s SN:%s", self._device_info.firmware, self._device_info.serial_number)
+                # Her bağlantıda cihazı tam init et (seri no + PC mode)
+                loop = asyncio.get_event_loop()
+                self._device_info = await loop.run_in_executor(None, self._query_version)
+                if self._device_info:
+                    logger.info("GammaScout FW:%s SN:%s", self._device_info.firmware, self._device_info.serial_number)
                 if not self.enter_online_mode():
                     self.disconnect()
                     await asyncio.sleep(5)
                     continue
+                _consecutive_failures = 0
 
             loop = asyncio.get_event_loop()
             dose_rate = await loop.run_in_executor(None, self.read_once)
 
             if dose_rate is not None:
+                _consecutive_failures = 0
+                dose_rate *= self.calibration_factor
                 self._cumulative_dose += dose_rate * (interval / 3600)
                 reading = Reading(
                     timestamp=datetime.now(timezone.utc).isoformat(),
@@ -272,10 +285,13 @@ class GammaScoutReader:
                         await self._on_reading(reading)
                     except Exception as e:
                         logger.error("Reading callback hatası: %s", e)
-            elif not self._connected:
-                self.disconnect()
-                await asyncio.sleep(5)
-                continue
+            else:
+                _consecutive_failures += 1
+                if not self._connected or _consecutive_failures >= 3:
+                    logger.warning("Okuma başarısız (%d), yeniden bağlanılıyor...", _consecutive_failures)
+                    self.disconnect()
+                    await asyncio.sleep(5)
+                    continue
 
             await asyncio.sleep(interval)
 

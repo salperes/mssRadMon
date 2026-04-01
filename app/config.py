@@ -25,6 +25,7 @@ DEFAULTS: dict[str, str] = {
     "alarm_high_actions": "buzzer,light",
     "alarm_high_high_actions": "buzzer,light,emergency",
     "shifts": "[]",
+    "calibration_factor": "1.0",
 }
 
 

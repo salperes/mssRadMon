@@ -31,7 +31,8 @@ showSection(initSection);
 
 const FIELDS = [
     "device_name", "device_location", "device_serial",
-    "sampling_interval", "threshold_high", "threshold_high_high",
+    "sampling_interval", "calibration_factor",
+    "threshold_high", "threshold_high_high",
     "threshold_high_duration", "threshold_high_high_duration",
     "alarm_high_actions", "alarm_high_high_actions",
     "gpio_buzzer_pin", "gpio_light_pin", "gpio_emergency_pin",
@@ -192,7 +193,7 @@ async function loadAlarmHistory() {
         alarms.forEach(a => {
             const d = new Date(a.timestamp);
             const timeStr = d.toLocaleString("tr-TR");
-            const levelStr = a.level === "high_high" ? "KRITIK" : "UYARI";
+            const levelStr = a.level === "high_high" ? "KRİTİK" : "UYARI";
             const row = document.createElement("tr");
             row.innerHTML = `<td>${timeStr}</td><td>${levelStr}</td><td>${a.dose_rate.toFixed(3)} µSv/h</td><td>${a.action_taken}</td>`;
             tbody.appendChild(row);
@@ -313,7 +314,7 @@ document.getElementById("wifiConnectBtn").addEventListener("click", async () => 
         msgEl.style.color = data.ok ? "var(--green)" : "var(--red)";
         if (data.ok) { setTimeout(loadWifiStatus, 2000); loadSavedNetworks(); }
     } catch (e) {
-        msgEl.textContent = "Baglanti hatasi"; msgEl.style.color = "var(--red)";
+        msgEl.textContent = "Bağlantı hatası"; msgEl.style.color = "var(--red)";
     }
 });
 

@@ -113,6 +113,10 @@ def create_app() -> FastAPI:
 
         reader.on_reading(on_reading)
 
+        # Kalibrasyon faktörünü serial reader'a aktar
+        cal_factor_str = await config.get("calibration_factor") or "1.0"
+        reader.calibration_factor = float(cal_factor_str)
+
         # Background tasks
         interval = int(await config.get("sampling_interval") or "10")
         reader_task = asyncio.create_task(reader.run(interval=interval))
