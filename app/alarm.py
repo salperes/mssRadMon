@@ -5,6 +5,7 @@ import smtplib
 from datetime import datetime, timezone
 from email.message import EmailMessage
 from enum import Enum
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,8 @@ class AlarmManager:
         self._active_level: AlarmLevel | None = None
         self._gpio_devices: dict[str, OutputDevice] = {}
         self._buzzer_task: asyncio.Task | None = None
+        self._exceed_start: float | None = None
+        self._exceed_level: AlarmLevel | None = None
 
     async def init(self):
         """GPIO cihazlarini baslat."""
@@ -54,12 +57,16 @@ class AlarmManager:
                     logger.warning("GPIO %s (pin %s) başlatılamadı: %s", name, pin, e)
 
     async def check(self, dose_rate: float) -> AlarmLevel | None:
-        """Doz hizini kontrol et. Alarm tetiklenirse seviyeyi dondur."""
+        """Doz hizini kontrol et. Sure dolunca alarm tetikle."""
         high = float(await self._config.get("threshold_high") or "0.5")
         high_high = float(await self._config.get("threshold_high_high") or "1.0")
+        high_dur = float(await self._config.get("threshold_high_duration") or "120")
+        high_high_dur = float(await self._config.get("threshold_high_high_duration") or "15")
 
-        # Esik altina dustuyse temizle
+        # Esik altina dustuyse sayaci sifirla ve temizle
         if dose_rate < high:
+            self._exceed_start = None
+            self._exceed_level = None
             if self._active_level is not None:
                 await self._clear_alarm()
             return None
@@ -67,17 +74,53 @@ class AlarmManager:
         # Seviyeyi belirle
         if dose_rate >= high_high:
             new_level = AlarmLevel.HIGH_HIGH
+            required_dur = high_high_dur
         else:
             new_level = AlarmLevel.HIGH
+            required_dur = high_dur
 
-        # Zaten ayni seviyede aktifse tekrar tetikleme
+        now = time.monotonic()
+
+        # Seviye degistiyse sayaci sifirla
+        if self._exceed_level != new_level:
+            self._exceed_start = now
+            self._exceed_level = new_level
+            return None
+
+        # Gecen sureyi hesapla
+        elapsed = now - self._exceed_start
+
+        # Sure dolmadiysa pending olarak kal
+        if elapsed < required_dur:
+            return None
+
+        # Zaten ayni seviyede aktif alarm varsa tekrar tetikleme
         if self._active_level == new_level:
             return None
 
-        # Yeni alarm tetikle
+        # Sure doldu — alarm tetikle
         self._active_level = new_level
         await self._trigger_alarm(new_level, dose_rate)
         return new_level
+
+    async def get_pending_info(self) -> dict:
+        """Pending alarm bilgisi — dashboard ve WS icin."""
+        if self._exceed_start is None or self._exceed_level is None or self._active_level == self._exceed_level:
+            return {
+                "alarm_pending": False,
+                "alarm_pending_level": None,
+                "alarm_pending_elapsed": 0,
+                "alarm_pending_duration": 0,
+            }
+        elapsed = time.monotonic() - self._exceed_start
+        dur_key = f"threshold_{self._exceed_level.value}_duration"
+        duration = float(await self._config.get(dur_key) or "0")
+        return {
+            "alarm_pending": True,
+            "alarm_pending_level": self._exceed_level.value,
+            "alarm_pending_elapsed": round(elapsed),
+            "alarm_pending_duration": round(duration),
+        }
 
     async def _trigger_alarm(self, level: AlarmLevel, dose_rate: float):
         """Alarm aksiyonlarini calistir."""
