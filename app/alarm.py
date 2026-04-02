@@ -314,7 +314,10 @@ class AlarmManager:
                 base_url, api_key, phone_list, label, dose_rate, device_name,
             ),
         )
-        sent = sum(1 for r in results if r)
+        sent = sum(1 for r in results if r["ok"])
+        for r in results:
+            if not r["ok"] and r["error"]:
+                logger.warning("msgService WA basarisiz (%s): %s", r["phone"], r["error"])
         logger.info(
             "msgService WA gonderildi: %d/%d (level=%s)", sent, len(phone_list), level.value
         )

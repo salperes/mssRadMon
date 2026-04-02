@@ -1,8 +1,9 @@
 """msgService REST API client — e-posta ve WhatsApp gonderimi."""
+import http.client
 import json
 import logging
 import ssl
-import urllib.request
+import urllib.parse
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
@@ -18,30 +19,49 @@ def _local_time() -> str:
     return datetime.now().strftime("%H:%M - %d/%m/%Y")
 
 
+def _conn(parsed: urllib.parse.ParseResult) -> http.client.HTTPConnection:
+    host = parsed.hostname
+    port = parsed.port
+    if parsed.scheme == "https":
+        return http.client.HTTPSConnection(host, port, context=_ssl_ctx, timeout=_TIMEOUT)
+    return http.client.HTTPConnection(host, port, timeout=_TIMEOUT)
+
+
 def _post(url: str, api_key: str, payload: dict) -> dict | None:
-    data = json.dumps(payload).encode()
-    req = urllib.request.Request(
-        url,
-        data=data,
-        headers={"Content-Type": "application/json", "X-API-Key": api_key},
-        method="POST",
-    )
+    data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    parsed = urllib.parse.urlparse(url)
+    conn = _conn(parsed)
     try:
-        with urllib.request.urlopen(req, timeout=_TIMEOUT, context=_ssl_ctx) as resp:
-            return json.loads(resp.read())
+        conn.request(
+            "POST",
+            parsed.path or "/",
+            body=data,
+            headers={
+                "Content-Type": "application/json; charset=utf-8",
+                "X-API-Key": api_key.encode("utf-8"),
+            },
+        )
+        resp = conn.getresponse()
+        return json.loads(resp.read().decode("utf-8"))
     except Exception as e:
         logger.error("msgService POST %s hatasi: %s", url, e)
         return None
+    finally:
+        conn.close()
 
 
 def _get(url: str) -> dict | None:
-    req = urllib.request.Request(url, method="GET")
+    parsed = urllib.parse.urlparse(url)
+    conn = _conn(parsed)
     try:
-        with urllib.request.urlopen(req, timeout=_TIMEOUT, context=_ssl_ctx) as resp:
-            return json.loads(resp.read())
+        conn.request("GET", parsed.path or "/")
+        resp = conn.getresponse()
+        return json.loads(resp.read().decode("utf-8"))
     except Exception as e:
         logger.error("msgService GET %s hatasi: %s", url, e)
         return None
+    finally:
+        conn.close()
 
 
 def send_mail(
@@ -96,8 +116,10 @@ def send_whatsapp(
     level_label: str,
     dose_rate: float,
     device_name: str,
-) -> list[str | None]:
-    """Her numara icin ayri WA mesaji gonder. MessageId listesi doner (None = basarisiz)."""
+) -> list[dict]:
+    """Her numara icin ayri WA mesaji gonder.
+    Her eleman: {"ok": bool, "phone": str, "messageId": str|None, "error": str|None}
+    """
     if not base_url or not api_key or not phone_list:
         return []
 
@@ -107,7 +129,7 @@ def send_whatsapp(
         f"Cihaz: {device_name}"
     )
 
-    results: list[str | None] = []
+    results: list[dict] = []
     for phone in phone_list:
         payload = {
             "phone": phone.strip(),
@@ -120,9 +142,12 @@ def send_whatsapp(
         }
         result = _post(f"{base_url}/api/wa/send", api_key, payload)
         if result and result.get("success"):
-            results.append(result.get("messageId"))
+            results.append({"ok": True, "phone": phone, "messageId": result.get("messageId"), "error": None})
         else:
-            results.append(None)
+            error = None
+            if result:
+                error = result.get("error") or result.get("message") or result.get("detail")
+            results.append({"ok": False, "phone": phone, "messageId": None, "error": error})
     return results
 
 

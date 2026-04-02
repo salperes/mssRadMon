@@ -159,5 +159,9 @@ async def msgservice_test_wa(request: Request, body: dict):
             base_url, api_key, phone_list, label, 0.0, device_name,
         ),
     )
-    sent = [r for r in results if r]
-    return {"ok": bool(sent), "sent": len(sent), "total": len(phone_list)}
+    sent = [r for r in results if r["ok"]]
+    if sent:
+        return {"ok": True, "sent": len(sent), "total": len(phone_list)}
+    errors = [r["error"] for r in results if r["error"]]
+    err_msg = errors[0] if errors else "Gönderilemedi — URL/key/numara kontrol edin"
+    return {"ok": False, "message": err_msg, "sent": 0, "total": len(phone_list)}
