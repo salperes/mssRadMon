@@ -305,8 +305,12 @@ body {
     font-size: 0.78rem;
     color: var(--text-dim);
     padding: 0.1rem 0;
-    font-variant-numeric: tabular-nums;
 }
 .period-label {
     font-weight: 500;
+    min-width: 4.5rem;
+}
+.period-dose-row span[id] {
+    font-family: ui-monospace, "SFMono-Regular", "Cascadia Code", Menlo, monospace;
+    font-variant-numeric: tabular-nums;
 }
