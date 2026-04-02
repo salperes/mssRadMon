@@ -1,11 +1,14 @@
 """mssRadMon — FastAPI uygulama giriş noktası."""
 import asyncio
+import hashlib
+import hmac
 import logging
 import os
+import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -23,6 +26,36 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+ADMIN_USERNAME = "mssadmin"
+ADMIN_PASSWORD = "Ankara12!"
+_SECRET_KEY = "mssRadMon-session-key-2026"
+_SESSION_TTL = 28800  # 8 saat
+_COOKIE_NAME = "mssradmon_session"
+
+
+def _sign_cookie(username: str) -> str:
+    ts = str(int(time.time()))
+    msg = f"{username}:{ts}"
+    sig = hmac.new(_SECRET_KEY.encode(), msg.encode(), hashlib.sha256).hexdigest()
+    return f"{msg}:{sig}"
+
+
+def _verify_cookie(value: str) -> str | None:
+    try:
+        parts = value.split(":")
+        if len(parts) != 3:
+            return None
+        username, ts_str, sig = parts
+        msg = f"{username}:{ts_str}"
+        expected = hmac.new(_SECRET_KEY.encode(), msg.encode(), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(sig, expected):
+            return None
+        if int(time.time()) - int(ts_str) > _SESSION_TTL:
+            return None
+        return username
+    except Exception:
+        return None
 
 DB_PATH = os.environ.get("MSSRADMON_DB_PATH", "data/readings.db")
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
@@ -151,8 +184,40 @@ def create_app() -> FastAPI:
     async def dashboard_page(request: Request):
         return templates.TemplateResponse("dashboard.html", {"request": request, "active": "dashboard"})
 
+    @app.get("/admin/login", response_class=HTMLResponse, include_in_schema=False)
+    async def admin_login_page(request: Request, error: int = 0):
+        return templates.TemplateResponse(
+            "login.html", {"request": request, "error": bool(error)}
+        )
+
+    @app.post("/admin/login", include_in_schema=False)
+    async def admin_login(request: Request):
+        form = await request.form()
+        username = form.get("username", "")
+        password = form.get("password", "")
+        if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
+            token = _sign_cookie(username)
+            resp = RedirectResponse(url="/admin", status_code=303)
+            resp.set_cookie(
+                _COOKIE_NAME, token,
+                max_age=_SESSION_TTL,
+                httponly=True,
+                samesite="lax",
+            )
+            return resp
+        return RedirectResponse(url="/admin/login?error=1", status_code=303)
+
+    @app.post("/admin/logout", include_in_schema=False)
+    async def admin_logout(request: Request):
+        resp = RedirectResponse(url="/admin/login", status_code=303)
+        resp.delete_cookie(_COOKIE_NAME)
+        return resp
+
     @app.get("/admin", response_class=HTMLResponse, include_in_schema=False)
     async def admin_page(request: Request):
+        token = request.cookies.get(_COOKIE_NAME, "")
+        if not _verify_cookie(token):
+            return RedirectResponse(url="/admin/login", status_code=303)
         return templates.TemplateResponse("admin.html", {"request": request, "active": "admin"})
 
     return app
