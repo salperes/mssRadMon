@@ -40,6 +40,13 @@ CREATE TABLE IF NOT EXISTS shift_doses (
 );
 CREATE INDEX IF NOT EXISTS idx_shift_doses_date ON shift_doses(date);
 CREATE INDEX IF NOT EXISTS idx_shift_doses_active ON shift_doses(completed) WHERE completed = 0;
+
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    role TEXT NOT NULL CHECK(role IN ('admin', 'viewer'))
+);
 """
 
 
