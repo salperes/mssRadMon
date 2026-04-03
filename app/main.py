@@ -1,18 +1,25 @@
 """mssRadMon — FastAPI uygulama giriş noktası."""
 import asyncio
-import hashlib
-import hmac
 import logging
 import os
-import time
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from app.alarm import AlarmManager
+from app.auth import (
+    _hash_password,
+    _sign_cookie,
+    _verify_cookie,
+    _SESSION_TTL,
+    COOKIE_NAME,
+    get_current_user,
+    require_admin,
+    verify_api_key,
+)
 from app.config import Config
 from app.db import Database
 from app.remote_log import RemoteLogForwarder
@@ -26,36 +33,6 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 logger = logging.getLogger(__name__)
-
-ADMIN_USERNAME = "mssadmin"
-ADMIN_PASSWORD = "Ankara12!"
-_SECRET_KEY = "mssRadMon-session-key-2026"
-_SESSION_TTL = 28800  # 8 saat
-_COOKIE_NAME = "mssradmon_session"
-
-
-def _sign_cookie(username: str) -> str:
-    ts = str(int(time.time()))
-    msg = f"{username}:{ts}"
-    sig = hmac.new(_SECRET_KEY.encode(), msg.encode(), hashlib.sha256).hexdigest()
-    return f"{msg}:{sig}"
-
-
-def _verify_cookie(value: str) -> str | None:
-    try:
-        parts = value.split(":")
-        if len(parts) != 3:
-            return None
-        username, ts_str, sig = parts
-        msg = f"{username}:{ts_str}"
-        expected = hmac.new(_SECRET_KEY.encode(), msg.encode(), hashlib.sha256).hexdigest()
-        if not hmac.compare_digest(sig, expected):
-            return None
-        if int(time.time()) - int(ts_str) > _SESSION_TTL:
-            return None
-        return username
-    except Exception:
-        return None
 
 DB_PATH = os.environ.get("MSSRADMON_DB_PATH", "data/readings.db")
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
@@ -74,6 +51,16 @@ def create_app() -> FastAPI:
         await db.init()
         config = Config(db)
         await config.init()
+
+        # users tablosu boşsa mssadmin'i ekle (ilk kurulum)
+        user_count = await db.fetch_one("SELECT COUNT(*) as n FROM users")
+        if user_count["n"] == 0:
+            pw_hash = _hash_password("Ankara12!", "mssadmin")
+            await db.execute(
+                "INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)",
+                ("mssadmin", pw_hash, "admin"),
+            )
+            logger.info("İlk kullanıcı oluşturuldu: mssadmin (admin)")
 
         alarm_manager = AlarmManager(db=db, config=config)
         await alarm_manager.init()
@@ -193,13 +180,19 @@ def create_app() -> FastAPI:
     @app.post("/admin/login", include_in_schema=False)
     async def admin_login(request: Request):
         form = await request.form()
-        username = form.get("username", "")
-        password = form.get("password", "")
-        if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
+        username = str(form.get("username", ""))
+        password = str(form.get("password", ""))
+        db = request.app.state.db
+        pw_hash = _hash_password(password, username)
+        row = await db.fetch_one(
+            "SELECT username FROM users WHERE username = ? AND password_hash = ?",
+            (username, pw_hash),
+        )
+        if row:
             token = _sign_cookie(username)
             resp = RedirectResponse(url="/admin", status_code=303)
             resp.set_cookie(
-                _COOKIE_NAME, token,
+                COOKIE_NAME, token,
                 max_age=_SESSION_TTL,
                 httponly=True,
                 samesite="lax",
@@ -210,15 +203,123 @@ def create_app() -> FastAPI:
     @app.post("/admin/logout", include_in_schema=False)
     async def admin_logout(request: Request):
         resp = RedirectResponse(url="/admin/login", status_code=303)
-        resp.delete_cookie(_COOKIE_NAME)
+        resp.delete_cookie(COOKIE_NAME)
         return resp
 
     @app.get("/admin", response_class=HTMLResponse, include_in_schema=False)
     async def admin_page(request: Request):
-        token = request.cookies.get(_COOKIE_NAME, "")
+        token = request.cookies.get(COOKIE_NAME, "")
         if not _verify_cookie(token):
             return RedirectResponse(url="/admin/login", status_code=303)
-        return templates.TemplateResponse("admin.html", {"request": request, "active": "admin"})
+        username = _verify_cookie(token)
+        row = await request.app.state.db.fetch_one(
+            "SELECT role FROM users WHERE username = ?", (username,)
+        )
+        user_role = row["role"] if row else "viewer"
+        return templates.TemplateResponse(
+            "admin.html",
+            {"request": request, "active": "admin", "user_role": user_role, "username": username},
+        )
+
+    import secrets as _secrets
+
+    @app.post("/api/apikey/generate", include_in_schema=False)
+    async def generate_api_key(
+        request: Request,
+        _user: dict = Depends(require_admin),
+    ):
+        """Yeni API key üret ve kaydet. Admin cookie zorunlu."""
+        new_key = _secrets.token_hex(32)
+        await request.app.state.config.set("api_key", new_key)
+        return {"api_key": new_key}
+
+    @app.get("/api/users", include_in_schema=False)
+    async def list_users(
+        request: Request,
+        _user: dict = Depends(require_admin),
+    ):
+        rows = await request.app.state.db.fetch_all(
+            "SELECT id, username, role FROM users ORDER BY id"
+        )
+        return rows
+
+    @app.post("/api/users", include_in_schema=False)
+    async def create_user(
+        request: Request,
+        body: dict,
+        _user: dict = Depends(require_admin),
+    ):
+        username = body.get("username", "").strip()
+        password = body.get("password", "")
+        role = body.get("role", "viewer")
+        if not username or not password:
+            raise HTTPException(400, detail="username ve password zorunlu")
+        if role not in ("admin", "viewer"):
+            raise HTTPException(400, detail="role 'admin' veya 'viewer' olmalı")
+        pw_hash = _hash_password(password, username)
+        try:
+            await request.app.state.db.execute(
+                "INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)",
+                (username, pw_hash, role),
+            )
+        except Exception:
+            raise HTTPException(409, detail="Bu kullanıcı adı zaten mevcut")
+        return {"ok": True}
+
+    @app.delete("/api/users/{username}", include_in_schema=False)
+    async def delete_user(
+        request: Request,
+        username: str,
+        current_user: dict = Depends(require_admin),
+    ):
+        if username == current_user["username"]:
+            raise HTTPException(400, detail="Kendi hesabınızı silemezsiniz")
+        target = await request.app.state.db.fetch_one(
+            "SELECT role FROM users WHERE username = ?", (username,)
+        )
+        if not target:
+            raise HTTPException(404, detail="Kullanıcı bulunamadı")
+        if target["role"] == "admin":
+            count = await request.app.state.db.fetch_one(
+                "SELECT COUNT(*) as n FROM users WHERE role = 'admin'"
+            )
+            if count["n"] <= 1:
+                raise HTTPException(400, detail="Son admin silinemez")
+        await request.app.state.db.execute(
+            "DELETE FROM users WHERE username = ?", (username,)
+        )
+        return {"ok": True}
+
+    @app.put("/api/users/{username}/password", include_in_schema=False)
+    async def change_password(
+        request: Request,
+        username: str,
+        body: dict,
+        current_user: dict = Depends(get_current_user),
+    ):
+        is_self = username == current_user["username"]
+        is_admin = current_user["role"] == "admin"
+        if not is_self and not is_admin:
+            raise HTTPException(403, detail="Başkasının şifresini değiştiremezsiniz")
+        new_password = body.get("new_password", "")
+        if not new_password:
+            raise HTTPException(400, detail="new_password zorunlu")
+        if is_self:
+            current_password = body.get("current_password", "")
+            if not current_password:
+                raise HTTPException(400, detail="current_password zorunlu")
+            row = await request.app.state.db.fetch_one(
+                "SELECT id FROM users WHERE username = ? AND password_hash = ?",
+                (username, _hash_password(current_password, username)),
+            )
+            if not row:
+                raise HTTPException(400, detail="Mevcut şifre yanlış")
+        new_hash = _hash_password(new_password, username)
+        await request.app.state.db.execute(
+            "UPDATE users SET password_hash = ? WHERE username = ?",
+            (new_hash, username),
+        )
+        return {"ok": True}
 
     return app
 
