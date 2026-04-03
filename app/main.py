@@ -2,8 +2,10 @@
 import asyncio
 import logging
 import os
+import secrets
 from contextlib import asynccontextmanager
 
+import aiosqlite
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -18,6 +20,7 @@ from app.auth import (
     COOKIE_NAME,
     get_current_user,
     require_admin,
+    require_admin_or_apikey,
     verify_api_key,
 )
 from app.config import Config
@@ -209,9 +212,9 @@ def create_app() -> FastAPI:
     @app.get("/admin", response_class=HTMLResponse, include_in_schema=False)
     async def admin_page(request: Request):
         token = request.cookies.get(COOKIE_NAME, "")
-        if not _verify_cookie(token):
-            return RedirectResponse(url="/admin/login", status_code=303)
         username = _verify_cookie(token)
+        if not username:
+            return RedirectResponse(url="/admin/login", status_code=303)
         row = await request.app.state.db.fetch_one(
             "SELECT role FROM users WHERE username = ?", (username,)
         )
@@ -221,15 +224,13 @@ def create_app() -> FastAPI:
             {"request": request, "active": "admin", "user_role": user_role, "username": username},
         )
 
-    import secrets as _secrets
-
     @app.post("/api/apikey/generate", include_in_schema=False)
     async def generate_api_key(
         request: Request,
         _user: dict = Depends(require_admin),
     ):
         """Yeni API key üret ve kaydet. Admin cookie zorunlu."""
-        new_key = _secrets.token_hex(32)
+        new_key = secrets.token_hex(32)
         await request.app.state.config.set("api_key", new_key)
         return {"api_key": new_key}
 
@@ -262,7 +263,7 @@ def create_app() -> FastAPI:
                 "INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)",
                 (username, pw_hash, role),
             )
-        except Exception:
+        except aiosqlite.IntegrityError:
             raise HTTPException(409, detail="Bu kullanıcı adı zaten mevcut")
         return {"ok": True}
 
