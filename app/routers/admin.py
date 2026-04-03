@@ -1,11 +1,12 @@
 """Admin API endpointleri — ayar yönetimi ve WiFi kontrolü."""
 import asyncio
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Depends
 
 from app import msg_service, wifi
+from app.auth import verify_api_key, require_admin_or_apikey
 
-router = APIRouter(prefix="/api", tags=["admin"])
+router = APIRouter(prefix="/api", tags=["admin"], dependencies=[Depends(verify_api_key)])
 
 
 @router.get("/settings")
@@ -15,7 +16,7 @@ async def get_settings(request: Request):
     return await config.get_all()
 
 
-@router.put("/settings")
+@router.put("/settings", dependencies=[Depends(require_admin_or_apikey)])
 async def update_settings(request: Request, settings: dict):
     """Ayarları güncelle."""
     config = request.app.state.config
