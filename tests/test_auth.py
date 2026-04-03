@@ -97,3 +97,94 @@ async def test_verify_api_key_valid_cookie_bypasses_key():
     request.app.state.config.get = AsyncMock(return_value="")  # key yok ama önemli değil
     request.headers.get = MagicMock(return_value=None)
     await verify_api_key(request)  # exception yok
+
+
+@pytest.mark.asyncio
+async def test_get_current_user_valid_cookie():
+    """Geçerli cookie ile kullanıcı dict döner."""
+    from app.auth import get_current_user, _sign_cookie
+    token = _sign_cookie("mssadmin")
+    request = MagicMock()
+    request.cookies.get = MagicMock(return_value=token)
+    request.app.state.db.fetch_one = AsyncMock(return_value={"username": "mssadmin", "role": "admin"})
+    result = await get_current_user(request)
+    assert result["username"] == "mssadmin"
+    assert result["role"] == "admin"
+
+
+@pytest.mark.asyncio
+async def test_get_current_user_invalid_cookie():
+    """Geçersiz cookie 401 döner."""
+    from fastapi import HTTPException
+    from app.auth import get_current_user
+    request = MagicMock()
+    request.cookies.get = MagicMock(return_value="invalid:token:bad")
+    with pytest.raises(HTTPException) as exc:
+        await get_current_user(request)
+    assert exc.value.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_get_current_user_not_in_db():
+    """Geçerli cookie ama DB'de kullanıcı yoksa 401 döner."""
+    from fastapi import HTTPException
+    from app.auth import get_current_user, _sign_cookie
+    token = _sign_cookie("ghost")
+    request = MagicMock()
+    request.cookies.get = MagicMock(return_value=token)
+    request.app.state.db.fetch_one = AsyncMock(return_value=None)
+    with pytest.raises(HTTPException) as exc:
+        await get_current_user(request)
+    assert exc.value.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_require_admin_passes_for_admin():
+    """admin rolü geçer."""
+    from app.auth import require_admin
+    result = await require_admin({"username": "mssadmin", "role": "admin"})
+    assert result["role"] == "admin"
+
+
+@pytest.mark.asyncio
+async def test_require_admin_rejects_viewer():
+    """viewer rolü 403 döner."""
+    from fastapi import HTTPException
+    from app.auth import require_admin
+    with pytest.raises(HTTPException) as exc:
+        await require_admin({"username": "op1", "role": "viewer"})
+    assert exc.value.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_require_admin_or_apikey_viewer_cookie_rejected():
+    """viewer cookie 403 döner."""
+    from fastapi import HTTPException
+    from app.auth import require_admin_or_apikey, _sign_cookie
+    token = _sign_cookie("viewer1")
+    request = MagicMock()
+    request.cookies.get = MagicMock(return_value=token)
+    request.app.state.db.fetch_one = AsyncMock(return_value={"role": "viewer"})
+    with pytest.raises(HTTPException) as exc:
+        await require_admin_or_apikey(request)
+    assert exc.value.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_require_admin_or_apikey_admin_cookie_passes():
+    """admin cookie geçer."""
+    from app.auth import require_admin_or_apikey, _sign_cookie
+    token = _sign_cookie("mssadmin")
+    request = MagicMock()
+    request.cookies.get = MagicMock(return_value=token)
+    request.app.state.db.fetch_one = AsyncMock(return_value={"role": "admin"})
+    await require_admin_or_apikey(request)  # exception yok
+
+
+@pytest.mark.asyncio
+async def test_require_admin_or_apikey_no_cookie_passes():
+    """Cookie yoksa (API key path) geçer."""
+    from app.auth import require_admin_or_apikey
+    request = MagicMock()
+    request.cookies.get = MagicMock(return_value="")
+    await require_admin_or_apikey(request)  # exception yok
