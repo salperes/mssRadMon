@@ -14,6 +14,8 @@
             <a href="#" class="sidebar-link" data-section="remotelog">Uzak Log</a>
             <a href="#" class="sidebar-link" data-section="wifi">WiFi</a>
             <a href="#" class="sidebar-link" data-section="shifts">Vardiyalar</a>
+            <a href="#" class="sidebar-link" data-section="api-access">API Erişimi</a>
+            <a href="#" class="sidebar-link" id="usersLink" data-section="users">Kullanıcılar</a>
             <a href="#" class="sidebar-link" data-section="history">Alarm Geçmişi</a>
             <form method="post" action="/admin/logout" style="margin-top:auto;padding-top:0.5rem;">
                 <button type="submit" class="sidebar-link" style="width:100%;background:none;border:none;cursor:pointer;color:var(--red);text-align:left;">Çıkış</button>
@@ -383,6 +385,81 @@
             </div>
         </section>
 
+        <!-- API Erişimi -->
+        <section class="admin-section" id="sec-api-access">
+            <h2 class="section-title">API Erişimi</h2>
+            <div class="card">
+                <div class="form-group">
+                    <label>API Key</label>
+                    <div style="display:flex;gap:0.5rem;align-items:center;">
+                        <input type="text" id="apiKeyDisplay" readonly
+                               style="flex:1;font-family:monospace;font-size:0.85rem;"
+                               placeholder="Henüz üretilmemiş">
+                        <button class="btn" id="copyApiKeyBtn"
+                                style="background:var(--surface);border:1px solid var(--accent);white-space:nowrap;">
+                            Kopyala
+                        </button>
+                    </div>
+                </div>
+                <button class="btn" id="generateApiKeyBtn">Yeni Key Üret</button>
+                <span id="apiKeyMsg" class="save-msg"></span>
+                <p style="font-size:0.8rem;color:var(--text-dim);margin-top:1rem;">
+                    ⚠ Yeni key üretildiğinde eski key geçersiz olur. Bağlı manager'ı güncellemeyi unutmayın.
+                </p>
+            </div>
+        </section>
+
+        <!-- Kullanıcılar -->
+        <section class="admin-section" id="sec-users">
+            <h2 class="section-title">Kullanıcı Yönetimi</h2>
+
+            <div class="card">
+                <div class="card-title">Kullanıcılar</div>
+                <div id="userList" style="margin-bottom:1rem;"></div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">Yeni Kullanıcı Ekle</div>
+                <div class="dashboard-grid">
+                    <div class="form-group">
+                        <label for="newUsername">Kullanıcı Adı</label>
+                        <input type="text" id="newUsername" placeholder="operator1">
+                    </div>
+                    <div class="form-group">
+                        <label for="newUserRole">Rol</label>
+                        <select id="newUserRole" style="width:100%;padding:0.5rem 0.75rem;background:var(--surface);border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:var(--text);font-size:0.95rem;">
+                            <option value="viewer">viewer</option>
+                            <option value="admin">admin</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="newUserPassword">Şifre</label>
+                    <input type="password" id="newUserPassword">
+                </div>
+                <button class="btn" id="addUserBtn">Kullanıcı Ekle</button>
+                <span id="addUserMsg" class="save-msg"></span>
+            </div>
+
+            <div class="card">
+                <div class="card-title">Şifremi Değiştir</div>
+                <div class="form-group">
+                    <label for="currentPassword">Mevcut Şifre</label>
+                    <input type="password" id="currentPassword">
+                </div>
+                <div class="form-group">
+                    <label for="newPassword">Yeni Şifre</label>
+                    <input type="password" id="newPassword">
+                </div>
+                <div class="form-group">
+                    <label for="confirmPassword">Yeni Şifre (Tekrar)</label>
+                    <input type="password" id="confirmPassword">
+                </div>
+                <button class="btn" id="changePasswordBtn">Şifreyi Güncelle</button>
+                <span id="changePasswordMsg" class="save-msg"></span>
+            </div>
+        </section>
+
         <!-- Alarm Geçmişi -->
         <section class="admin-section" id="sec-history">
             <h2 class="section-title">Alarm Geçmişi</h2>
@@ -400,6 +477,20 @@
 </div>
 {% endblock %}
 
+<script>
+    const USER_ROLE = "{{ user_role }}";
+</script>
+<script>
+    // viewer rolünde kaydet butonları ve kullanıcı yönetimi bölümü gizlenir
+    if (USER_ROLE === "viewer") {
+        document.addEventListener("DOMContentLoaded", () => {
+            document.querySelectorAll(".save-section-btn, #saveBtn, #generateApiKeyBtn, #addUserBtn")
+                .forEach(btn => { btn.disabled = true; btn.style.opacity = "0.4"; });
+            const usersLink = document.getElementById("usersLink");
+            if (usersLink) usersLink.style.display = "none";
+        });
+    }
+</script>
 {% block scripts %}
 <script src="/static/js/admin.js"></script>
 {% endblock %}
