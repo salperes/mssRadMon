@@ -1,11 +1,12 @@
 """REST API endpointleri."""
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Depends
 
 from app.__version__ import __version__
+from app.auth import verify_api_key
 
-router = APIRouter(prefix="/api", tags=["api"])
+router = APIRouter(prefix="/api", tags=["api"], dependencies=[Depends(verify_api_key)])
 
 TZ_TR = timezone(timedelta(hours=3))
 
@@ -155,3 +156,14 @@ async def get_period_doses(request: Request):
         since = _period_start_iso(now_local, period)
         result[key] = await _calc_period_dose(db, since)
     return result
+
+
+@router.get("/device")
+async def get_device(request: Request):
+    """Cihaz kimlik bilgilerini döndür."""
+    config = request.app.state.config
+    return {
+        "device_name": await config.get("device_name") or "",
+        "device_location": await config.get("device_location") or "",
+        "device_serial": await config.get("device_serial") or "",
+    }

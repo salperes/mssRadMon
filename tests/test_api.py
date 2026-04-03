@@ -206,3 +206,30 @@ async def test_get_period_doses_returns_all_keys(seeded_db):
     assert set(result.keys()) == {"daily", "monthly", "quarterly", "half_yearly", "yearly"}
     for v in result.values():
         assert isinstance(v, float)
+
+
+@pytest.mark.asyncio
+async def test_get_device(seeded_db):
+    """GET /api/device cihaz bilgilerini döndürmeli."""
+    from app.routers.api import get_device
+    db, config = seeded_db
+    await config.set("device_name", "TestCihaz")
+    await config.set("device_location", "Test Odası")
+    await config.set("device_serial", "SN-001")
+    request = MagicMock()
+    request.app.state.config = config
+    result = await get_device(request)
+    assert result["device_name"] == "TestCihaz"
+    assert result["device_location"] == "Test Odası"
+    assert result["device_serial"] == "SN-001"
+
+
+@pytest.mark.asyncio
+async def test_get_device_empty_serial(seeded_db):
+    """Seri no okunmamışsa boş string döner."""
+    from app.routers.api import get_device
+    db, config = seeded_db
+    request = MagicMock()
+    request.app.state.config = config
+    result = await get_device(request)
+    assert result["device_serial"] == ""
