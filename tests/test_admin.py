@@ -51,9 +51,11 @@ async def test_update_settings(admin_deps):
 @pytest.mark.asyncio
 async def test_update_settings_viewer_rejected():
     """viewer rolüyle PUT /api/settings 403 dönmeli."""
-    import tempfile, os
+    import tempfile
+    import os
     from fastapi import HTTPException
-    from app.auth import _sign_cookie, _hash_password, require_admin_or_apikey
+    from app.routers.admin import update_settings, router
+    from app.auth import _sign_cookie, _hash_password
     from app.db import Database
     from app.config import Config
 
@@ -64,7 +66,6 @@ async def test_update_settings_viewer_rejected():
         await db.init()
         config = Config(db)
         await config.init()
-        # viewer kullanıcı ekle
         await db.execute(
             "INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)",
             ("viewer1", _hash_password("pass", "viewer1"), "viewer"),
@@ -75,9 +76,15 @@ async def test_update_settings_viewer_rejected():
         request.app.state.db = db
         request.cookies.get = lambda key, default="": token if key == "mssradmon_session" else default
         request.headers.get = MagicMock(return_value=None)
+        # Auth fonksiyonunun 403 verdiğini doğrula
+        from app.auth import require_admin_or_apikey
         with pytest.raises(HTTPException) as exc:
             await require_admin_or_apikey(request)
         assert exc.value.status_code == 403
+        # Endpoint'in dependency olarak tanımlandığını doğrula
+        put_route = next(r for r in router.routes if getattr(r, "path", "") == "/api/settings" and "PUT" in getattr(r, "methods", set()))
+        dep_calls = [d.dependency for d in put_route.dependencies]
+        assert require_admin_or_apikey in dep_calls, "require_admin_or_apikey /settings PUT'a bağlı değil"
         await db.close()
     finally:
         os.unlink(path)
