@@ -27,7 +27,7 @@ def _sign_cookie(username: str) -> str:
 
 def _verify_cookie(value: str) -> str | None:
     try:
-        parts = value.split(":")
+        parts = value.split(":", 2)
         if len(parts) != 3:
             return None
         username, ts_str, sig = parts
