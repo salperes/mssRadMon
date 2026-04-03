@@ -35,6 +35,7 @@ DEFAULTS: dict[str, str] = {
     "msg_service_high_high_wa_to": "",
     "shifts": "[]",
     "calibration_factor": "1.0",
+    "api_key": "",
 }
 
 
