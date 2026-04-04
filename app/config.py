@@ -4,6 +4,7 @@ from app.db import Database
 DEFAULTS: dict[str, str] = {
     "device_name": "GammaScout-01",
     "device_location": "",
+    "device_serial": "",
     "sampling_interval": "10",
     "threshold_high": "0.5",
     "threshold_high_high": "1.0",
