@@ -11,10 +11,51 @@ Her mssRadMon cihazı bağımsız bir HTTP sunucusudur. Manager, N adet cihaza a
 | Parametre | Değer |
 |---|---|
 | Varsayılan port | `8090` |
-| Base URL | `http://<cihaz-ip>:8090` |
+| Base URL | `http://<cihaz-ip>:8090` veya `https://<cihaz-ip>:8090` (SSL aktifse) |
 | Protokol | HTTP/1.1 + WebSocket |
 | İçerik tipi | `application/json` |
-| Kimlik doğrulama | Yalnızca `/admin/*` rotaları için gerekli (cookie-based session) |
+| API kimlik doğrulama | Tüm `/api/*` endpoint'leri API key gerektirir (`X-API-Key` header) |
+| Admin kimlik doğrulama | `/admin/*` rotaları cookie-based session gerektirir |
+
+---
+
+## API Key ile Bağlantı
+
+Tüm `/api/*` endpoint'leri `X-API-Key` header'ı ile doğrulama gerektirir. WebSocket (`/ws/live`) muaftır.
+
+### API Key Alma
+
+1. Cihazın admin paneline gidin: `http://<cihaz-ip>:8090/admin`
+2. Sidebar'da **"API Erişimi"** bölümüne tıklayın
+3. **"Yeni Key Üret"** butonuna tıklayın
+4. Gösterilen 64 karakterlik key'i kopyalayın — bu key yalnızca bir kez tam olarak gösterilir
+
+### Kullanım
+
+Her API isteğine `X-API-Key` header'ı ekleyin:
+
+```bash
+curl -H "X-API-Key: <api-key>" http://<cihaz-ip>:8090/api/current
+```
+
+```python
+import httpx
+
+client = httpx.Client(
+    base_url="http://192.168.1.100:8090",
+    headers={"X-API-Key": "a3f9...64_karakter_hex..."},
+)
+data = client.get("/api/current").json()
+```
+
+### Hata Yanıtları
+
+| HTTP Kodu | Durum | Açıklama |
+|---|---|---|
+| `401 Unauthorized` | `{"detail": "Geçersiz API key"}` | Key yanlış veya eksik |
+| `503 Service Unavailable` | `{"detail": "API key henüz üretilmemiş"}` | Admin panelden key üretilmemiş |
+
+> **Not:** API key değiştirildiğinde eski key geçersiz olur — manager'daki key'i güncellemeyi unutmayın.
 
 ---
 
@@ -215,11 +256,26 @@ Son N günün tamamlanmış vardiya doz kayıtları.
 
 ---
 
+## Cihaz Kimliği
+
+### `GET /api/device`
+Cihaz tanımlama bilgilerini döndürür. Manager'ın başlangıçta cihazı kaydetmesi için kullanın.
+
+```json
+{
+  "device_name": "GammaScout-01",
+  "device_location": "Reaktör Binası - Kat 2",
+  "device_serial": "GS-0042"
+}
+```
+
+> `device_serial` cihaz bağlandığında GammaScout'tan otomatik okunur. Henüz okunmamışsa boş string döner.
+
+---
+
 ## Ayar Yönetimi
 
-Admin API endpoint'leri **kimlik doğrulama gerektirmez** — yalnızca ağa erişim yeterlidir. Manager, cihaz ayarlarını hem okuyabilir hem yazabilir.
-
-> **Güvenlik notu:** Bu endpoint'ler ağda açıktır. Manager'ı güvenilir bir iç ağda veya VPN arkasında kullanın.
+Tüm ayar endpoint'leri API key ile korunur. `PUT /api/settings` ayrıca admin cookie veya API key gerektirir.
 
 ### `GET /api/settings`
 Cihazın tüm ayarlarını döndürür.
@@ -361,10 +417,13 @@ def set_shifts(device_ip: str, shifts: list[dict]):
 
 ## WebSocket — Gerçek Zamanlı Veri
 
+> **Not:** WebSocket endpoint'i API key gerektirmez — push-only olduğu için muaftır.
+
 ### Bağlantı
 
 ```
 ws://<cihaz-ip>:8090/ws/live
+wss://<cihaz-ip>:8090/ws/live   (SSL aktifse)
 ```
 
 ### Mesaj Formatı
@@ -428,7 +487,7 @@ Manager
 
 ### Cihaz Kimliği
 
-mssRadMon API'sinde cihaz kimliği yoktur; cihazı IP/hostname ile ayırt edin. Cihaz ismi ve lokasyonu `GET /api/settings` içinden okunabilir (admin kimlik doğrulaması gerekir).
+Her cihaz `GET /api/device` endpoint'i ile tanımlanabilir — cihaz adı, lokasyon ve seri numarası döner. Cihazı IP/hostname + seri numarası ile ayırt edin.
 
 ---
 
@@ -445,15 +504,16 @@ mssRadMon API'sinde cihaz kimliği yoktur; cihazı IP/hostname ile ayırt edin. 
 
 ## Özet: Hangi Endpoint, Ne Zaman
 
-| Amaç | Endpoint | Yöntem |
-|---|---|---|
-| Canlı doz takibi | `ws://.../ws/live` | WebSocket push |
-| Cihaz ayakta mı? | `GET /api/health` | 30sn polling |
-| Anlık değer (fallback) | `GET /api/current` | 10–30sn polling |
-| Son 1/6/24 saat grafiği | `GET /api/readings?last=1h` | İstek üzerine |
-| Günlük/dönemsel özet | `GET /api/period-doses` | Dakikada bir polling |
-| Alarm geçmişi | `GET /api/alarms?last=24h` | Periyodik veya event-driven |
-| Vardiya doz özeti | `GET /api/shift/history?days=7` | Vardiya değişiminde |
-| Aktif vardiya dozu | `GET /api/shift/current` | 60sn polling veya WS'den |
-| Tüm ayarları oku | `GET /api/settings` | İstek üzerine |
-| Ayar güncelle | `PUT /api/settings` | İstek üzerine |
+| Amaç | Endpoint | Yöntem | Auth |
+|---|---|---|---|
+| Canlı doz takibi | `ws://.../ws/live` | WebSocket push | Yok |
+| Cihaz ayakta mı? | `GET /api/health` | 30sn polling | API key |
+| Cihaz bilgileri | `GET /api/device` | İstek üzerine | API key |
+| Anlık değer (fallback) | `GET /api/current` | 10–30sn polling | API key |
+| Son 1/6/24 saat grafiği | `GET /api/readings?last=1h` | İstek üzerine | API key |
+| Günlük/dönemsel özet | `GET /api/period-doses` | Dakikada bir polling | API key |
+| Alarm geçmişi | `GET /api/alarms?last=24h` | Periyodik veya event-driven | API key |
+| Vardiya doz özeti | `GET /api/shift/history?days=7` | Vardiya değişiminde | API key |
+| Aktif vardiya dozu | `GET /api/shift/current` | 60sn polling veya WS'den | API key |
+| Tüm ayarları oku | `GET /api/settings` | İstek üzerine | API key |
+| Ayar güncelle | `PUT /api/settings` | İstek üzerine | API key + admin |
