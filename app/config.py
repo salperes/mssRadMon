@@ -36,6 +36,9 @@ DEFAULTS: dict[str, str] = {
     "shifts": "[]",
     "calibration_factor": "1.0",
     "api_key": "",
+    "ca_server_url": "",
+    "ca_api_key": "",
+    "ssl_enabled": "false",
 }
 
 
