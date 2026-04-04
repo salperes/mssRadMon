@@ -2,7 +2,7 @@
 
 // --- Sidebar Navigation ---
 
-const sidebarLinks = document.querySelectorAll(".sidebar-link");
+const sidebarLinks = document.querySelectorAll(".sidebar-link[data-section]");
 const sections = document.querySelectorAll(".admin-section");
 
 function showSection(name) {
@@ -43,6 +43,7 @@ const FIELDS = [
     "msg_service_mail_enabled", "msg_service_wa_enabled",
     "msg_service_high_mail_to", "msg_service_high_wa_to",
     "msg_service_high_high_mail_to", "msg_service_high_high_wa_to",
+    "ca_server_url", "ca_api_key",
 ];
 
 const TOGGLE_FIELDS = [
@@ -458,12 +459,363 @@ document.getElementById("addShiftBtn").addEventListener("click", () => {
     document.getElementById("newShiftEnd").value = "16:00";
 });
 
+// --- API Key ---
+
+let fullApiKey = null;
+
+async function loadApiKey() {
+    try {
+        const res = await fetch("/api/settings");
+        const settings = await res.json();
+        const key = settings.api_key || "";
+        const display = document.getElementById("apiKeyDisplay");
+        if (key) {
+            display.value = key.slice(0, 4) + "•".repeat(60);
+            fullApiKey = null; // tam key bilinmiyor, sadece maskelenmiş gösterilir
+        } else {
+            display.value = "";
+            display.placeholder = "Henüz üretilmemiş";
+        }
+    } catch (e) {
+        console.error("API key yuklenemedi:", e);
+    }
+}
+
+document.getElementById("generateApiKeyBtn").addEventListener("click", async () => {
+    if (!confirm("Yeni key üretilecek. Eski key geçersiz olacak. Devam?")) return;
+    const msgEl = document.getElementById("apiKeyMsg");
+    try {
+        const res = await fetch("/api/apikey/generate", { method: "POST" });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            msgEl.textContent = err.detail || "Hata oluştu";
+            msgEl.style.color = "var(--red)";
+            msgEl.classList.add("show");
+            setTimeout(() => msgEl.classList.remove("show"), 4000);
+            return;
+        }
+        const data = await res.json();
+        fullApiKey = data.api_key;
+        document.getElementById("apiKeyDisplay").value = fullApiKey;
+        msgEl.textContent = "Key üretildi — kopyalayın!";
+        msgEl.style.color = "var(--green)";
+        msgEl.classList.add("show");
+        setTimeout(() => msgEl.classList.remove("show"), 5000);
+    } catch (e) {
+        msgEl.textContent = "İstek hatası";
+        msgEl.style.color = "var(--red)";
+        msgEl.classList.add("show");
+        setTimeout(() => msgEl.classList.remove("show"), 4000);
+    }
+});
+
+document.getElementById("copyApiKeyBtn").addEventListener("click", async () => {
+    const display = document.getElementById("apiKeyDisplay");
+    const text = fullApiKey || display.value;
+    if (!text || text.includes("•")) {
+        alert("Kopyalanacak key yok. Önce yeni key üretin.");
+        return;
+    }
+    try {
+        await navigator.clipboard.writeText(text);
+        const btn = document.getElementById("copyApiKeyBtn");
+        const orig = btn.textContent;
+        btn.textContent = "Kopyalandı!";
+        setTimeout(() => { btn.textContent = orig; }, 2000);
+    } catch (e) {
+        // Fallback: select input
+        display.select();
+        document.execCommand("copy");
+    }
+});
+
+// --- Kullanıcı Yönetimi ---
+
+let currentUsername = null;
+
+async function loadCurrentUser() {
+    try {
+        const res = await fetch("/api/users/me");
+        if (res.ok) {
+            const data = await res.json();
+            currentUsername = data.username;
+        }
+    } catch (e) {
+        // ignore — currentUsername kalır null
+    }
+}
+
+async function loadUsers() {
+    const container = document.getElementById("userList");
+    try {
+        const res = await fetch("/api/users");
+        if (!res.ok) {
+            container.innerHTML = '<span style="color:var(--text-dim)">Kullanıcılar yüklenemedi</span>';
+            return;
+        }
+        const users = await res.json();
+        container.innerHTML = "";
+        if (users.length === 0) {
+            container.innerHTML = '<span style="color:var(--text-dim)">Kullanıcı yok</span>';
+            return;
+        }
+        const table = document.createElement("table");
+        table.className = "alarm-table";
+        table.innerHTML = "<thead><tr><th>Kullanıcı</th><th>Rol</th><th></th></tr></thead>";
+        const tbody = document.createElement("tbody");
+        const adminCount = users.filter(u => u.role === "admin").length;
+        users.forEach(u => {
+            const tr = document.createElement("tr");
+            const roleBadge = u.role === "admin"
+                ? '<span style="background:var(--accent);color:#fff;padding:0.15rem 0.5rem;border-radius:4px;font-size:0.75rem;">admin</span>'
+                : '<span style="background:var(--surface);padding:0.15rem 0.5rem;border-radius:4px;font-size:0.75rem;">viewer</span>';
+            const isSelf = u.username === currentUsername;
+            const isLastAdmin = u.role === "admin" && adminCount <= 1;
+            const disableDelete = isSelf || isLastAdmin;
+            tr.innerHTML = `<td>${u.username}</td><td>${roleBadge}</td><td></td>`;
+            const delBtn = document.createElement("button");
+            delBtn.textContent = "Sil";
+            delBtn.style.cssText = "background:none;border:1px solid var(--red);color:var(--red);border-radius:4px;padding:0.15rem 0.5rem;cursor:pointer;font-size:0.75rem;";
+            if (disableDelete) {
+                delBtn.disabled = true;
+                delBtn.style.opacity = "0.3";
+                delBtn.style.cursor = "default";
+            } else {
+                delBtn.addEventListener("click", async () => {
+                    if (!confirm(`"${u.username}" silinecek. Emin misiniz?`)) return;
+                    try {
+                        const r = await fetch(`/api/users/${encodeURIComponent(u.username)}`, { method: "DELETE" });
+                        if (r.ok) {
+                            loadUsers();
+                        } else {
+                            const err = await r.json().catch(() => ({}));
+                            alert(err.detail || "Silme hatası");
+                        }
+                    } catch (e) {
+                        alert("İstek hatası");
+                    }
+                });
+            }
+            tr.lastChild.appendChild(delBtn);
+            tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        container.appendChild(table);
+    } catch (e) {
+        container.innerHTML = '<span style="color:var(--red)">Kullanıcılar yüklenemedi</span>';
+    }
+}
+
+document.getElementById("addUserBtn").addEventListener("click", async () => {
+    const username = document.getElementById("newUsername").value.trim();
+    const password = document.getElementById("newUserPassword").value;
+    const role = document.getElementById("newUserRole").value;
+    const msgEl = document.getElementById("addUserMsg");
+    if (!username || !password) {
+        msgEl.textContent = "Kullanıcı adı ve şifre zorunlu";
+        msgEl.style.color = "var(--red)";
+        msgEl.classList.add("show");
+        setTimeout(() => msgEl.classList.remove("show"), 3000);
+        return;
+    }
+    try {
+        const res = await fetch("/api/users", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, password, role }),
+        });
+        if (res.ok) {
+            document.getElementById("newUsername").value = "";
+            document.getElementById("newUserPassword").value = "";
+            msgEl.textContent = "Kullanıcı eklendi";
+            msgEl.style.color = "var(--green)";
+            msgEl.classList.add("show");
+            setTimeout(() => msgEl.classList.remove("show"), 3000);
+            loadUsers();
+        } else {
+            const err = await res.json().catch(() => ({}));
+            msgEl.textContent = err.detail || "Ekleme hatası";
+            msgEl.style.color = "var(--red)";
+            msgEl.classList.add("show");
+            setTimeout(() => msgEl.classList.remove("show"), 4000);
+        }
+    } catch (e) {
+        msgEl.textContent = "İstek hatası";
+        msgEl.style.color = "var(--red)";
+        msgEl.classList.add("show");
+        setTimeout(() => msgEl.classList.remove("show"), 3000);
+    }
+});
+
+document.getElementById("changePasswordBtn").addEventListener("click", async () => {
+    const currentPw = document.getElementById("currentPassword").value;
+    const newPw = document.getElementById("newPassword").value;
+    const confirmPw = document.getElementById("confirmPassword").value;
+    const msgEl = document.getElementById("changePasswordMsg");
+    if (!currentPw || !newPw) {
+        msgEl.textContent = "Tüm alanları doldurun";
+        msgEl.style.color = "var(--red)";
+        msgEl.classList.add("show");
+        setTimeout(() => msgEl.classList.remove("show"), 3000);
+        return;
+    }
+    if (newPw !== confirmPw) {
+        msgEl.textContent = "Yeni şifreler eşleşmiyor";
+        msgEl.style.color = "var(--red)";
+        msgEl.classList.add("show");
+        setTimeout(() => msgEl.classList.remove("show"), 3000);
+        return;
+    }
+    if (!currentUsername) {
+        msgEl.textContent = "Kullanıcı bilgisi alınamadı";
+        msgEl.style.color = "var(--red)";
+        msgEl.classList.add("show");
+        setTimeout(() => msgEl.classList.remove("show"), 3000);
+        return;
+    }
+    try {
+        const res = await fetch(`/api/users/${encodeURIComponent(currentUsername)}/password`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ current_password: currentPw, new_password: newPw }),
+        });
+        if (res.ok) {
+            document.getElementById("currentPassword").value = "";
+            document.getElementById("newPassword").value = "";
+            document.getElementById("confirmPassword").value = "";
+            msgEl.textContent = "Şifre güncellendi";
+            msgEl.style.color = "var(--green)";
+            msgEl.classList.add("show");
+            setTimeout(() => msgEl.classList.remove("show"), 3000);
+        } else {
+            const err = await res.json().catch(() => ({}));
+            msgEl.textContent = err.detail || "Şifre güncellenemedi";
+            msgEl.style.color = "var(--red)";
+            msgEl.classList.add("show");
+            setTimeout(() => msgEl.classList.remove("show"), 4000);
+        }
+    } catch (e) {
+        msgEl.textContent = "İstek hatası";
+        msgEl.style.color = "var(--red)";
+        msgEl.classList.add("show");
+        setTimeout(() => msgEl.classList.remove("show"), 3000);
+    }
+});
+
+// --- SSL Yönetimi ---
+
+async function loadSslStatus() {
+    try {
+        const res = await fetch("/api/ssl/status");
+        if (!res.ok) return;
+        const s = await res.json();
+
+        const caDot = document.getElementById("sslCaDot");
+        const caText = document.getElementById("sslCaText");
+        caDot.className = "conn-dot " + (s.ca_trusted ? "connected" : "");
+        caText.textContent = s.ca_trusted ? "Güvenilir" : "Güvenilmiyor";
+
+        const certDot = document.getElementById("sslCertDot");
+        const certText = document.getElementById("sslCertText");
+        if (s.has_cert) {
+            certDot.className = "conn-dot connected";
+            let txt = "Aktif";
+            if (s.expiry) txt += " (son geçerlilik: " + s.expiry + ")";
+            certText.textContent = txt;
+        } else {
+            certDot.className = "conn-dot";
+            certText.textContent = "Yok";
+        }
+
+        const httpsDot = document.getElementById("sslHttpsDot");
+        const httpsText = document.getElementById("sslHttpsText");
+        httpsDot.className = "conn-dot " + (s.ssl_enabled ? "connected" : "");
+        httpsText.textContent = s.ssl_enabled ? "Aktif" : "Pasif";
+    } catch (e) {
+        console.error("SSL durum yüklenemedi:", e);
+    }
+}
+
+document.getElementById("sslCaTestBtn").addEventListener("click", async () => {
+    const msgEl = document.getElementById("sslCaMsg");
+    msgEl.textContent = "Test ediliyor...";
+    msgEl.style.color = "var(--text-dim)";
+    await saveSettings(null);
+    try {
+        const res = await fetch("/api/ssl/status");
+        const s = await res.json();
+        if (s.ca_server && s.ca_server.reachable) {
+            msgEl.textContent = "CA sunucu erişilebilir" + (s.ca_server.initialized ? " — CA aktif" : " — CA başlatılmamış");
+            msgEl.style.color = "var(--green)";
+        } else {
+            msgEl.textContent = "CA sunucu erişilemez";
+            msgEl.style.color = "var(--red)";
+        }
+    } catch (e) {
+        msgEl.textContent = "Bağlantı hatası";
+        msgEl.style.color = "var(--red)";
+    }
+});
+
+document.getElementById("sslTrustCaBtn").addEventListener("click", async () => {
+    const msgEl = document.getElementById("sslCaMsg");
+    msgEl.textContent = "CA sertifikası yükleniyor...";
+    msgEl.style.color = "var(--text-dim)";
+    try {
+        const res = await fetch("/api/ssl/trust-ca", { method: "POST" });
+        const data = await res.json();
+        msgEl.textContent = data.message;
+        msgEl.style.color = data.ok ? "var(--green)" : "var(--red)";
+        if (data.ok) loadSslStatus();
+    } catch (e) {
+        msgEl.textContent = "İstek hatası";
+        msgEl.style.color = "var(--red)";
+    }
+});
+
+document.getElementById("sslRequestBtn").addEventListener("click", async () => {
+    const hostname = document.getElementById("sslHostname").value.trim();
+    const msgEl = document.getElementById("sslRequestMsg");
+    if (!hostname) {
+        msgEl.textContent = "Hostname zorunlu";
+        msgEl.style.color = "var(--red)";
+        return;
+    }
+    if (!confirm("Sertifika talep edilecek ve servis yeniden başlatılacak. Devam?")) return;
+    msgEl.textContent = "Sertifika talep ediliyor...";
+    msgEl.style.color = "var(--text-dim)";
+    try {
+        const res = await fetch("/api/ssl/request", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ hostname }),
+        });
+        const data = await res.json();
+        msgEl.textContent = data.message;
+        msgEl.style.color = data.ok ? "var(--green)" : "var(--red)";
+        if (data.ok) {
+            setTimeout(() => {
+                window.location.protocol = "https:";
+                window.location.reload();
+            }, 3000);
+        }
+    } catch (e) {
+        msgEl.textContent = "İstek hatası";
+        msgEl.style.color = "var(--red)";
+    }
+});
+
 // --- Init ---
 
 loadSettings();
 loadAlarmHistory();
 loadWifiStatus();
 loadShifts();
+loadApiKey();
+if (USER_ROLE === "admin") loadSslStatus();
+loadCurrentUser().then(() => {
+    if (USER_ROLE === "admin") loadUsers();
+});
 
 // --- msgService ---
 

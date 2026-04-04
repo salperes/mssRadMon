@@ -15,6 +15,7 @@
             <a href="#" class="sidebar-link" data-section="wifi">WiFi</a>
             <a href="#" class="sidebar-link" data-section="shifts">Vardiyalar</a>
             <a href="#" class="sidebar-link" data-section="api-access">API Erişimi</a>
+            <a href="#" class="sidebar-link" data-section="ssl">SSL Yönetimi</a>
             <a href="#" class="sidebar-link" id="usersLink" data-section="users">Kullanıcılar</a>
             <a href="#" class="sidebar-link" data-section="history">Alarm Geçmişi</a>
             <form method="post" action="/admin/logout" style="margin-top:auto;padding-top:0.5rem;">
@@ -396,7 +397,7 @@
                                style="flex:1;font-family:monospace;font-size:0.85rem;"
                                placeholder="Henüz üretilmemiş">
                         <button class="btn" id="copyApiKeyBtn"
-                                style="background:var(--surface);border:1px solid var(--accent);white-space:nowrap;">
+                                style="background:var(--surface);border:1px solid var(--accent);color:var(--accent);white-space:nowrap;">
                             Kopyala
                         </button>
                     </div>
@@ -460,6 +461,52 @@
             </div>
         </section>
 
+        <!-- SSL Yönetimi -->
+        <section class="admin-section" id="sec-ssl">
+            <h2 class="section-title">SSL Yönetimi</h2>
+
+            <div class="card">
+                <div class="card-title">Durum</div>
+                <div id="sslStatusPanel" style="display:flex;flex-direction:column;gap:0.4rem;font-size:0.9rem;">
+                    <div><span id="sslCaDot" class="conn-dot"></span> CA: <span id="sslCaText">—</span></div>
+                    <div><span id="sslCertDot" class="conn-dot"></span> Sertifika: <span id="sslCertText">—</span></div>
+                    <div><span id="sslHttpsDot" class="conn-dot"></span> HTTPS: <span id="sslHttpsText">—</span></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">CA Ayarları</div>
+                <div class="form-group">
+                    <label for="ca_server_url">CA Sunucu URL</label>
+                    <input type="url" id="ca_server_url" placeholder="http://192.168.88.111:3020">
+                </div>
+                <div class="form-group">
+                    <label for="ca_api_key">CA API Key</label>
+                    <input type="password" id="ca_api_key" placeholder="CA sunucudan alınan API key">
+                </div>
+                <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
+                    <button class="btn save-section-btn">Kaydet</button>
+                    <span class="save-msg save-section-msg">Ayarlar kaydedildi.</span>
+                    <button class="btn" id="sslCaTestBtn" style="background:var(--surface);border:1px solid var(--accent);color:var(--accent);">Bağlantı Testi</button>
+                    <button class="btn" id="sslTrustCaBtn" style="background:var(--surface);border:1px solid var(--green);color:var(--green);">CA Sertifikasını Güvenilir Yap</button>
+                </div>
+                <span id="sslCaMsg" style="display:block;margin-top:0.5rem;font-size:0.85rem;"></span>
+            </div>
+
+            <div class="card">
+                <div class="card-title">Sertifika Talebi</div>
+                <div class="form-group">
+                    <label for="sslHostname">Hostname</label>
+                    <input type="text" id="sslHostname" placeholder="mssradmon.mss.local">
+                </div>
+                <button class="btn" id="sslRequestBtn">Sertifika Talep Et</button>
+                <span id="sslRequestMsg" style="display:inline-block;margin-left:0.75rem;font-size:0.85rem;"></span>
+                <p style="font-size:0.8rem;color:var(--text-dim);margin-top:1rem;">
+                    ⚠ Sertifika talep edildiğinde servis yeniden başlatılır. Bağlantınız birkaç saniye kesilecektir.
+                </p>
+            </div>
+        </section>
+
         <!-- Alarm Geçmişi -->
         <section class="admin-section" id="sec-history">
             <h2 class="section-title">Alarm Geçmişi</h2>
@@ -477,6 +524,7 @@
 </div>
 {% endblock %}
 
+{% block scripts %}
 <script>
     const USER_ROLE = "{{ user_role }}";
 </script>
@@ -484,13 +532,12 @@
     // viewer rolünde kaydet butonları ve kullanıcı yönetimi bölümü gizlenir
     if (USER_ROLE === "viewer") {
         document.addEventListener("DOMContentLoaded", () => {
-            document.querySelectorAll(".save-section-btn, #saveBtn, #generateApiKeyBtn, #addUserBtn")
+            document.querySelectorAll(".save-section-btn, #saveBtn, #generateApiKeyBtn, #addUserBtn, #sslTrustCaBtn, #sslRequestBtn")
                 .forEach(btn => { btn.disabled = true; btn.style.opacity = "0.4"; });
             const usersLink = document.getElementById("usersLink");
             if (usersLink) usersLink.style.display = "none";
         });
     }
 </script>
-{% block scripts %}
 <script src="/static/js/admin.js"></script>
 {% endblock %}
