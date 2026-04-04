@@ -43,7 +43,6 @@ const FIELDS = [
     "msg_service_mail_enabled", "msg_service_wa_enabled",
     "msg_service_high_mail_to", "msg_service_high_wa_to",
     "msg_service_high_high_mail_to", "msg_service_high_high_wa_to",
-    "ca_server_url", "ca_api_key",
 ];
 
 const TOGGLE_FIELDS = [
@@ -736,37 +735,24 @@ async function loadSslStatus() {
     }
 }
 
-document.getElementById("sslCaTestBtn").addEventListener("click", async () => {
-    const msgEl = document.getElementById("sslCaMsg");
-    msgEl.textContent = "Test ediliyor...";
-    msgEl.style.color = "var(--text-dim)";
-    await saveSettings(null);
-    try {
-        const res = await fetch("/api/ssl/status");
-        const s = await res.json();
-        if (s.ca_server && s.ca_server.reachable) {
-            msgEl.textContent = "CA sunucu erişilebilir" + (s.ca_server.initialized ? " — CA aktif" : " — CA başlatılmamış");
-            msgEl.style.color = "var(--green)";
-        } else {
-            msgEl.textContent = "CA sunucu erişilemez";
-            msgEl.style.color = "var(--red)";
-        }
-    } catch (e) {
-        msgEl.textContent = "Bağlantı hatası";
-        msgEl.style.color = "var(--red)";
-    }
-});
-
 document.getElementById("sslTrustCaBtn").addEventListener("click", async () => {
     const msgEl = document.getElementById("sslCaMsg");
+    const fileInput = document.getElementById("caCertFile");
+    if (!fileInput.files.length) {
+        msgEl.textContent = "Dosya seçin";
+        msgEl.style.color = "var(--red)";
+        return;
+    }
     msgEl.textContent = "CA sertifikası yükleniyor...";
     msgEl.style.color = "var(--text-dim)";
     try {
-        const res = await fetch("/api/ssl/trust-ca", { method: "POST" });
+        const formData = new FormData();
+        formData.append("file", fileInput.files[0]);
+        const res = await fetch("/api/ssl/trust-ca", { method: "POST", body: formData });
         const data = await res.json();
         msgEl.textContent = data.message;
         msgEl.style.color = data.ok ? "var(--green)" : "var(--red)";
-        if (data.ok) loadSslStatus();
+        if (data.ok) { fileInput.value = ""; loadSslStatus(); }
     } catch (e) {
         msgEl.textContent = "İstek hatası";
         msgEl.style.color = "var(--red)";

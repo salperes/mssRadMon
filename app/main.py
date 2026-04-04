@@ -6,7 +6,7 @@ import secrets
 from contextlib import asynccontextmanager
 
 import aiosqlite
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -249,9 +249,11 @@ def create_app() -> FastAPI:
     @app.post("/api/ssl/trust-ca", include_in_schema=False)
     async def ssl_trust_ca(
         request: Request,
+        file: UploadFile = File(...),
         _user: dict = Depends(require_admin),
     ):
-        return await request.app.state.ssl_manager.trust_ca()
+        pem_data = (await file.read()).decode("utf-8", errors="replace")
+        return await request.app.state.ssl_manager.trust_ca(pem_data)
 
     @app.post("/api/ssl/request", include_in_schema=False)
     async def ssl_request_cert(

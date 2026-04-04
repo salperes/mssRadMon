@@ -70,19 +70,10 @@ class SslManager:
             logger.warning("Sertifika bilgisi okunamadı: %s", e)
             return None, None
 
-    async def trust_ca(self) -> dict:
-        """CA sertifikasını indir ve sisteme güvenilir olarak ekle."""
-        ca_url = await self._config.get("ca_server_url")
-        if not ca_url:
-            return {"ok": False, "message": "CA sunucu URL ayarlanmamış"}
-
-        try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                res = await client.get(f"{ca_url}/api/ca/certificate")
-                res.raise_for_status()
-                pem_data = res.text
-        except Exception as e:
-            return {"ok": False, "message": f"CA sertifikası indirilemedi: {e}"}
+    async def trust_ca(self, pem_data: str) -> dict:
+        """Yüklenen CA sertifikasını kaydet ve sisteme güvenilir olarak ekle."""
+        if not pem_data or "BEGIN CERTIFICATE" not in pem_data:
+            return {"ok": False, "message": "Geçersiz sertifika dosyası"}
 
         os.makedirs(self._ssl_dir, exist_ok=True)
         with open(self.ca_path, "w") as f:

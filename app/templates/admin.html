@@ -475,22 +475,13 @@
             </div>
 
             <div class="card">
-                <div class="card-title">CA Ayarları</div>
+                <div class="card-title">CA Sertifikası</div>
                 <div class="form-group">
-                    <label for="ca_server_url">CA Sunucu URL</label>
-                    <input type="url" id="ca_server_url" placeholder="http://192.168.88.111:3020">
+                    <label for="caCertFile">CA Sertifika Dosyası (.crt / .pem)</label>
+                    <input type="file" id="caCertFile" accept=".crt,.pem,.cer" style="font-size:0.9rem;">
                 </div>
-                <div class="form-group">
-                    <label for="ca_api_key">CA API Key</label>
-                    <input type="password" id="ca_api_key" placeholder="CA sunucudan alınan API key">
-                </div>
-                <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
-                    <button class="btn save-section-btn">Kaydet</button>
-                    <span class="save-msg save-section-msg">Ayarlar kaydedildi.</span>
-                    <button class="btn" id="sslCaTestBtn" style="background:var(--surface);border:1px solid var(--accent);color:var(--accent);">Bağlantı Testi</button>
-                    <button class="btn" id="sslTrustCaBtn" style="background:var(--surface);border:1px solid var(--green);color:var(--green);">CA Sertifikasını Güvenilir Yap</button>
-                </div>
-                <span id="sslCaMsg" style="display:block;margin-top:0.5rem;font-size:0.85rem;"></span>
+                <button class="btn" id="sslTrustCaBtn" style="background:var(--surface);border:1px solid var(--green);color:var(--green);">Yükle ve Güvenilir Yap</button>
+                <span id="sslCaMsg" style="display:inline-block;margin-left:0.75rem;font-size:0.85rem;"></span>
             </div>
 
             <div class="card">

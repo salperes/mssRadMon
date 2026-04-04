@@ -53,15 +53,26 @@ async def test_ssl_status_with_cert(ssl_deps):
 
 
 @pytest.mark.asyncio
-async def test_trust_ca_no_url(ssl_deps):
-    """CA URL yokken trust_ca hata dönmeli."""
+async def test_trust_ca_invalid_pem(ssl_deps):
+    """Geçersiz PEM verisi ile trust_ca hata dönmeli."""
     from app.ssl import SslManager
 
     db, config = ssl_deps
     mgr = SslManager(config=config, ssl_dir="/tmp/test_ssl_trust")
-    result = await mgr.trust_ca()
+    result = await mgr.trust_ca("not a certificate")
     assert result["ok"] is False
-    assert "url" in result["message"].lower() or "URL" in result["message"]
+    assert "Geçersiz" in result["message"]
+
+
+@pytest.mark.asyncio
+async def test_trust_ca_empty(ssl_deps):
+    """Boş PEM verisi ile trust_ca hata dönmeli."""
+    from app.ssl import SslManager
+
+    db, config = ssl_deps
+    mgr = SslManager(config=config, ssl_dir="/tmp/test_ssl_trust2")
+    result = await mgr.trust_ca("")
+    assert result["ok"] is False
 
 
 @pytest.mark.asyncio
