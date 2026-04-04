@@ -15,6 +15,7 @@ class ShiftManager:
         self._config = config
         self._last_cumulative: float | None = None
         self._active_shift_id: str | None = None
+        self._active_shift_date: str | None = None
 
     async def _get_shifts(self) -> list[dict]:
         """Config'den vardiya tanimlarini oku."""
@@ -46,6 +47,19 @@ class ShiftManager:
                     return shift
         return None
 
+    def _shift_date(self, active: dict, now: datetime) -> str:
+        """Vardiya tarihini hesapla.
+
+        Gece vardiyas (start > end) icin gece yarisi ile bitis saati arasindaki
+        sure dunkun tarihine aittir; boylece tek kayit gece yarisi bolunmez.
+        """
+        start = active["start"]
+        end = active["end"]
+        current_time = now.strftime("%H:%M")
+        if start > end and current_time < end:
+            return (now - timedelta(days=1)).strftime("%Y-%m-%d")
+        return now.strftime("%Y-%m-%d")
+
     async def check(self, cumulative_dose: float):
         """Her okumada cagrilir. Aktif vardiyayi belirler, dozu gunceller."""
         now = datetime.now()
@@ -54,24 +68,27 @@ class ShiftManager:
         if not shifts:
             self._last_cumulative = cumulative_dose
             self._active_shift_id = None
+            self._active_shift_date = None
             return
 
         active = self._find_active_shift(shifts, now)
-        today = now.strftime("%Y-%m-%d")
 
         # Onceki aktif vardiya bittiyse kapat
         if self._active_shift_id and (active is None or active["id"] != self._active_shift_id):
             await self._db.execute(
                 "UPDATE shift_doses SET completed = 1 WHERE shift_id = ? AND date = ? AND completed = 0",
-                (self._active_shift_id, today),
+                (self._active_shift_id, self._active_shift_date),
             )
             self._active_shift_id = None
+            self._active_shift_date = None
 
         if active is None:
             self._last_cumulative = cumulative_dose
             return
 
         self._active_shift_id = active["id"]
+        today = self._shift_date(active, now)
+        self._active_shift_date = today
 
         # Bu vardiya icin bugunun kaydini bul veya olustur
         row = await self._db.fetch_one(
@@ -80,13 +97,26 @@ class ShiftManager:
         )
 
         if row is None:
-            # Yeni vardiya basladi
-            await self._db.execute(
-                "INSERT INTO shift_doses (shift_id, shift_name, date, start_time, end_time, dose, completed) VALUES (?, ?, ?, ?, ?, 0.0, 0)",
-                (active["id"], active["name"], today, active["start"], active["end"]),
+            # completed=1 olan kayit var mi? (servis restart sonrasi)
+            existing = await self._db.fetch_one(
+                "SELECT id, dose FROM shift_doses WHERE shift_id = ? AND date = ?",
+                (active["id"], today),
             )
-            self._last_cumulative = cumulative_dose
-            return
+            if existing:
+                # Mevcut kaydi tekrar ac
+                await self._db.execute(
+                    "UPDATE shift_doses SET completed = 0 WHERE id = ?",
+                    (existing["id"],),
+                )
+                row = existing
+            else:
+                # Yeni vardiya basladi
+                await self._db.execute(
+                    "INSERT INTO shift_doses (shift_id, shift_name, date, start_time, end_time, dose, completed) VALUES (?, ?, ?, ?, ?, 0.0, 0)",
+                    (active["id"], active["name"], today, active["start"], active["end"]),
+                )
+                self._last_cumulative = cumulative_dose
+                return
 
         # Doz farkini hesapla ve ekle
         if self._last_cumulative is not None:
@@ -109,7 +139,7 @@ class ShiftManager:
         if active is None:
             return {"active": False, "shift_name": None, "shift_dose": 0.0}
 
-        today = now.strftime("%Y-%m-%d")
+        today = self._shift_date(active, now)
         row = await self._db.fetch_one(
             "SELECT dose FROM shift_doses WHERE shift_id = ? AND date = ? AND completed = 0",
             (active["id"], today),
@@ -130,9 +160,31 @@ class ShiftManager:
         return rows
 
     async def close_stale(self):
-        """Uygulama baslarken completed=0 olan eski kayitlari kapat."""
-        today = datetime.now().strftime("%Y-%m-%d")
-        await self._db.execute(
-            "UPDATE shift_doses SET completed = 1 WHERE completed = 0 AND date < ?",
-            (today,),
+        """Uygulama baslarken completed=0 olan eski kayitlari kapat.
+
+        Aktif bir gece vardiyasi varsa (gece yarisi - bitis saati arasinda),
+        o vardiyaya ait dunku kaydi henuz aktif oldugu icin kapatilmaz.
+        """
+        now = datetime.now()
+        today = now.strftime("%Y-%m-%d")
+        yesterday = (now - timedelta(days=1)).strftime("%Y-%m-%d")
+
+        shifts = await self._get_shifts()
+        active = self._find_active_shift(shifts, now)
+        is_overnight_morning = (
+            active is not None
+            and active["start"] > active["end"]
+            and now.strftime("%H:%M") < active["end"]
         )
+
+        if is_overnight_morning:
+            # Dunkunden oncesini kapat; dunku aktif gece vardiyasini dokunma
+            await self._db.execute(
+                "UPDATE shift_doses SET completed = 1 WHERE completed = 0 AND date < ? AND NOT (shift_id = ? AND date = ?)",
+                (today, active["id"], yesterday),
+            )
+        else:
+            await self._db.execute(
+                "UPDATE shift_doses SET completed = 1 WHERE completed = 0 AND date < ?",
+                (today,),
+            )

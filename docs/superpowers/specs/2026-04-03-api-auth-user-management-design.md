@@ -149,9 +149,12 @@ CREATE TABLE IF NOT EXISTS users (
 |---|---|---|
 | Dashboard (`/`) | ✓ | ✓ (login gerekmez) |
 | Admin paneli görüntüleme | ✓ | ✓ |
-| Ayar kaydetme (PUT) | ✓ | ✗ (403) |
-| Kullanıcı yönetimi | ✓ | ✗ |
+| `PUT /api/settings` | ✓ | ✗ `403 Forbidden` |
+| `POST/DELETE /api/users` | ✓ | ✗ `403 Forbidden` |
+| Kullanıcı yönetimi bölümü (UI) | ✓ | gizli |
 | Kendi şifresini değiştirme | ✓ | ✓ |
+
+`PUT /api/settings` ve kullanıcı yönetimi endpoint'leri, `require_admin` dependency ile server-side korunur — UI'daki disabled butonlar sadece ek katman.
 
 `viewer` için admin panelinde kaydet butonları `disabled` + gri renk; kullanıcı yönetimi bölümü gizli.
 

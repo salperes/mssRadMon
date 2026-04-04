@@ -5,6 +5,7 @@ from collections.abc import AsyncGenerator
 
 import pytest
 import pytest_asyncio
+from asgi_lifespan import LifespanManager
 from httpx import ASGITransport, AsyncClient
 
 
@@ -26,12 +27,13 @@ async def test_db_path():
 
 @pytest_asyncio.fixture
 async def test_client(test_db_path):
-    """FastAPI test client. DB path'i override eder."""
+    """FastAPI test client. Lifespan tetiklenir, DB path override edilir."""
     os.environ["MSSRADMON_DB_PATH"] = test_db_path
     from app.main import create_app
 
     app = create_app()
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        yield client
+    async with LifespanManager(app) as manager:
+        transport = ASGITransport(app=manager.app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            yield client
     os.environ.pop("MSSRADMON_DB_PATH", None)

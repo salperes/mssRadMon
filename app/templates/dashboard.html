@@ -78,13 +78,15 @@
 
 <div class="card">
     <div class="card-title">Vardiya Doz Geçmişi</div>
-    <table class="alarm-table" id="shiftHistoryTable">
-        <thead>
-            <tr><th>Tarih</th><th>Vardiya</th><th>Saat</th><th>Doz (µSv)</th></tr>
-        </thead>
-        <tbody id="shiftHistoryBody">
-        </tbody>
-    </table>
+    <div style="max-height:320px;overflow-y:auto;">
+        <table class="alarm-table" id="shiftHistoryTable">
+            <thead style="position:sticky;top:0;z-index:1;">
+                <tr><th style="background:var(--card);">Tarih</th><th style="background:var(--card);">Vardiya</th><th style="background:var(--card);">Saat</th><th style="background:var(--card);">Doz (µSv)</th></tr>
+            </thead>
+            <tbody id="shiftHistoryBody">
+            </tbody>
+        </table>
+    </div>
 </div>
 {% endblock %}
 

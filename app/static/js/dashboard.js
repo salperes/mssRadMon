@@ -33,6 +33,7 @@ const chart = new Chart(ctx, {
             data: [],
             borderColor: "#00bcd4",
             backgroundColor: "rgba(0,188,212,0.1)",
+            borderWidth: 1.5,
             fill: true,
             tension: 0.3,
             pointRadius: 0,
@@ -187,21 +188,44 @@ function formatTime(isoStr) {
 
 function setChartData(readings) {
     chartInteraction.resetView();
+    chartTimestamps = readings.map(r => new Date(r.timestamp));
     chart.data.labels = readings.map(r => formatTime(r.timestamp));
     chart.data.datasets[0].data = readings.map(r => r.dose_rate);
     chart.update();
 }
 
+// Zaman aralığını milisaniye cinsine çevir
+const RANGE_MS = { "1h": 3600e3, "6h": 6*3600e3, "24h": 24*3600e3, "7d": 7*86400e3, "30d": 30*86400e3 };
+
+// chartTimestamps: gerçek Date nesneleri — süzme için
+let chartTimestamps = [];
+
+function isUserZoomed() {
+    const sx = chart.options.scales.x;
+    return sx.min !== undefined || sx.max !== undefined;
+}
+
 function addChartPoint(timestamp, value) {
+    const ts = new Date(timestamp);
+    chartTimestamps.push(ts);
     chart.data.labels.push(formatTime(timestamp));
     chart.data.datasets[0].data.push(value);
 
-    const maxPoints = 3600;
-    if (chart.data.labels.length > maxPoints) {
+    // Seçili aralığa göre eski noktaları at
+    const windowMs = RANGE_MS[currentRange] || RANGE_MS["1h"];
+    const cutoff = new Date(Date.now() - windowMs);
+    while (chartTimestamps.length > 0 && chartTimestamps[0] < cutoff) {
+        chartTimestamps.shift();
         chart.data.labels.shift();
         chart.data.datasets[0].data.shift();
     }
-    chart.update("none");
+
+    // Kullanıcı zoom/pan yapmadıysa tam görünüm göster (floating)
+    if (!isUserZoomed()) {
+        chart.update("none");
+    } else {
+        chart.update("none");
+    }
 }
 
 async function loadReadings(range) {
@@ -313,6 +337,23 @@ setInterval(async () => {
 }, 5000);
 
 setInterval(loadPeriodDoses, 60000);
+
+// Periyodik olarak zaman penceresinin dışına çıkan eski noktaları temizle (60s)
+setInterval(() => {
+    if (!chartTimestamps.length) return;
+    const windowMs = RANGE_MS[currentRange] || RANGE_MS["1h"];
+    const cutoff = new Date(Date.now() - windowMs);
+    let removed = 0;
+    while (chartTimestamps.length > 0 && chartTimestamps[0] < cutoff) {
+        chartTimestamps.shift();
+        chart.data.labels.shift();
+        chart.data.datasets[0].data.shift();
+        removed++;
+    }
+    if (removed > 0 && !isUserZoomed()) {
+        chart.update("none");
+    }
+}, 60000);
 
 loadInitial();
 connectWS();

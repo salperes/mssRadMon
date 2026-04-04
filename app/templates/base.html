@@ -9,12 +9,18 @@
 </head>
 <body>
     <nav class="navbar">
-        <div class="nav-brand">mssRadMon</div>
+        <div class="nav-brand">mssRadMon <span id="navLocation" style="font-weight:400;opacity:0.55;font-size:0.85em;"></span></div>
         <div class="nav-links">
             <a href="/" class="{% if active == 'dashboard' %}active{% endif %}">Gösterge Paneli</a>
             <a href="/admin" class="{% if active == 'admin' %}active{% endif %}">Yönetim</a>
+            <span style="opacity:0.4;font-size:0.8em;">v{{ APP_VERSION }}</span>
         </div>
     </nav>
+    <script>
+        fetch("/api/settings").then(r=>r.ok?r.json():null).then(s=>{
+            if(s&&s.device_location){document.getElementById("navLocation").textContent="— "+s.device_location;}
+        }).catch(()=>{});
+    </script>
     <main class="container {% block container_class %}{% endblock %}">
         {% block content %}{% endblock %}
     </main>
