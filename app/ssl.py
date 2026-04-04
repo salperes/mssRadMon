@@ -70,6 +70,120 @@ class SslManager:
             logger.warning("Sertifika bilgisi okunamadı: %s", e)
             return None, None
 
+    async def trust_ca(self) -> dict:
+        """CA sertifikasını indir ve sisteme güvenilir olarak ekle."""
+        ca_url = await self._config.get("ca_server_url")
+        if not ca_url:
+            return {"ok": False, "message": "CA sunucu URL ayarlanmamış"}
+
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                res = await client.get(f"{ca_url}/api/ca/certificate")
+                res.raise_for_status()
+                pem_data = res.text
+        except Exception as e:
+            return {"ok": False, "message": f"CA sertifikası indirilemedi: {e}"}
+
+        os.makedirs(self._ssl_dir, exist_ok=True)
+        with open(self.ca_path, "w") as f:
+            f.write(pem_data)
+
+        try:
+            subprocess.run(
+                ["sudo", "cp", self.ca_path, CA_TRUST_PATH],
+                check=True, capture_output=True,
+            )
+            subprocess.run(
+                ["sudo", "update-ca-certificates"],
+                check=True, capture_output=True,
+            )
+        except subprocess.CalledProcessError as e:
+            return {"ok": False, "message": f"Sistem trust hatası: {e.stderr.decode().strip()}"}
+
+        logger.info("CA sertifikası sisteme güvenilir olarak eklendi")
+        return {"ok": True, "message": "CA sertifikası güvenilir olarak eklendi"}
+
+    async def request_cert(self, hostname: str) -> dict:
+        """CA sunucudan sertifika talep et, kaydet, servisi SSL ile restart et."""
+        ca_url = await self._config.get("ca_server_url")
+        if not ca_url:
+            return {"ok": False, "message": "CA sunucu URL ayarlanmamış"}
+
+        ca_api_key = await self._config.get("ca_api_key")
+        if not ca_api_key:
+            return {"ok": False, "message": "CA API key ayarlanmamış"}
+
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                res = await client.post(
+                    f"{ca_url}/api/certificates/request",
+                    json={
+                        "hostname": hostname,
+                        "ipAddress": "",
+                        "appName": "mssradmon",
+                    },
+                    headers={"X-API-Key": ca_api_key},
+                )
+                res.raise_for_status()
+                data = res.json()
+        except Exception as e:
+            return {"ok": False, "message": f"Sertifika talebi başarısız: {e}"}
+
+        os.makedirs(self._ssl_dir, exist_ok=True)
+
+        key_path = self.key_path
+        with open(key_path, "w") as f:
+            f.write(data["key"])
+        os.chmod(key_path, 0o600)
+
+        with open(self.cert_path, "w") as f:
+            f.write(data["cert"])
+
+        with open(self.ca_path, "w") as f:
+            f.write(data["caCert"])
+
+        await self._config.set("ssl_enabled", "true")
+
+        restart_ok = self._restart_service()
+
+        expiry = data.get("expiresAt", "")
+        logger.info("SSL sertifikası yüklendi: %s (expiry: %s)", hostname, expiry)
+
+        if not restart_ok:
+            return {
+                "ok": True,
+                "message": "Sertifika kaydedildi ancak servis yeniden başlatılamadı — manuel restart gerekli",
+                "expiry": expiry,
+            }
+
+        return {
+            "ok": True,
+            "message": "Sertifika yüklendi, HTTPS aktif — sayfa birkaç saniye içinde yeniden yüklenecek",
+            "expiry": expiry,
+        }
+
+    def _restart_service(self) -> bool:
+        """Systemd servisini SSL parametreleriyle restart et."""
+        service_src = os.path.join(os.path.dirname(__file__), "..", "systemd", "mssradmon-ssl.service")
+        service_src = os.path.abspath(service_src)
+        try:
+            subprocess.run(
+                ["sudo", "cp", service_src, "/etc/systemd/system/mssradmon.service"],
+                check=True, capture_output=True,
+            )
+            subprocess.run(
+                ["sudo", "systemctl", "daemon-reload"],
+                check=True, capture_output=True,
+            )
+            subprocess.run(
+                ["sudo", "systemctl", "restart", "mssradmon"],
+                check=True, capture_output=True,
+            )
+            return True
+        except subprocess.CalledProcessError as e:
+            logger.error("Servis restart hatası: %s", e.stderr.decode().strip())
+            return False
+
     async def _check_ca_server(self) -> dict:
         """CA sunucu erişilebilirliğini kontrol et."""
         ca_url = await self._config.get("ca_server_url")

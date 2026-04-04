@@ -1,0 +1,16 @@
+[Unit]
+Description=mssRadMon - GammaScout Radyasyon Monitörü (HTTPS)
+After=network.target
+
+[Service]
+Type=simple
+User=mssadmin
+WorkingDirectory=/home/mssadmin/mssRadMon
+ExecStart=/home/mssadmin/mssRadMon/.venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8090 --ssl-keyfile /home/mssadmin/mssRadMon/data/ssl/server.key --ssl-certfile /home/mssadmin/mssRadMon/data/ssl/server.crt
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

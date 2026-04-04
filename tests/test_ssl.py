@@ -50,3 +50,39 @@ async def test_ssl_status_with_cert(ssl_deps):
         assert status["subject"] is not None
         assert "test.mss.local" in status["subject"]
         assert status["expiry"] is not None
+
+
+@pytest.mark.asyncio
+async def test_trust_ca_no_url(ssl_deps):
+    """CA URL yokken trust_ca hata dönmeli."""
+    from app.ssl import SslManager
+
+    db, config = ssl_deps
+    mgr = SslManager(config=config, ssl_dir="/tmp/test_ssl_trust")
+    result = await mgr.trust_ca()
+    assert result["ok"] is False
+    assert "url" in result["message"].lower() or "URL" in result["message"]
+
+
+@pytest.mark.asyncio
+async def test_request_cert_no_url(ssl_deps):
+    """CA URL yokken request_cert hata dönmeli."""
+    from app.ssl import SslManager
+
+    db, config = ssl_deps
+    mgr = SslManager(config=config, ssl_dir="/tmp/test_ssl_req")
+    result = await mgr.request_cert("test.mss.local")
+    assert result["ok"] is False
+
+
+@pytest.mark.asyncio
+async def test_request_cert_no_api_key(ssl_deps):
+    """API key yokken request_cert hata dönmeli."""
+    from app.ssl import SslManager
+
+    db, config = ssl_deps
+    await config.set("ca_server_url", "http://fake:3020")
+    mgr = SslManager(config=config, ssl_dir="/tmp/test_ssl_req2")
+    result = await mgr.request_cert("test.mss.local")
+    assert result["ok"] is False
+    assert "api key" in result["message"].lower() or "API" in result["message"]
