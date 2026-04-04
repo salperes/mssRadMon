@@ -29,6 +29,7 @@ from app.remote_log import RemoteLogForwarder
 from app.routers import admin, api, ws
 from app.serial_reader import GammaScoutReader, Reading
 from app.shift import ShiftManager
+from app.ssl import SslManager
 from app import wifi
 
 logging.basicConfig(
@@ -88,6 +89,8 @@ def create_app() -> FastAPI:
         app.state.alarm = alarm_manager
         app.state.remote_log = remote_log
         app.state.shift_manager = shift_manager
+        ssl_manager = SslManager(config=config)
+        app.state.ssl_manager = ssl_manager
         app.state.reader = reader
         app.state.ws_clients = set()
 
@@ -169,6 +172,8 @@ def create_app() -> FastAPI:
     app.include_router(admin.router)
 
     templates = Jinja2Templates(directory=TEMPLATE_DIR)
+    from app.__version__ import __version__
+    templates.env.globals["APP_VERSION"] = __version__
 
     @app.get("/", response_class=HTMLResponse, include_in_schema=False)
     async def dashboard_page(request: Request):
@@ -206,7 +211,7 @@ def create_app() -> FastAPI:
     @app.post("/admin/logout", include_in_schema=False)
     async def admin_logout(request: Request):
         resp = RedirectResponse(url="/admin/login", status_code=303)
-        resp.delete_cookie(COOKIE_NAME)
+        resp.delete_cookie(COOKIE_NAME, httponly=True, samesite="lax")
         return resp
 
     @app.get("/admin", response_class=HTMLResponse, include_in_schema=False)
@@ -233,6 +238,37 @@ def create_app() -> FastAPI:
         new_key = secrets.token_hex(32)
         await request.app.state.config.set("api_key", new_key)
         return {"api_key": new_key}
+
+    @app.get("/api/ssl/status", include_in_schema=False)
+    async def ssl_status(
+        request: Request,
+        _user: dict = Depends(require_admin),
+    ):
+        return await request.app.state.ssl_manager.get_status()
+
+    @app.post("/api/ssl/trust-ca", include_in_schema=False)
+    async def ssl_trust_ca(
+        request: Request,
+        _user: dict = Depends(require_admin),
+    ):
+        return await request.app.state.ssl_manager.trust_ca()
+
+    @app.post("/api/ssl/request", include_in_schema=False)
+    async def ssl_request_cert(
+        request: Request,
+        body: dict,
+        _user: dict = Depends(require_admin),
+    ):
+        hostname = body.get("hostname", "").strip()
+        if not hostname:
+            raise HTTPException(400, detail="hostname zorunlu")
+        return await request.app.state.ssl_manager.request_cert(hostname)
+
+    @app.get("/api/users/me", include_in_schema=False)
+    async def get_current_user_info(
+        current_user: dict = Depends(get_current_user),
+    ):
+        return {"username": current_user["username"], "role": current_user["role"]}
 
     @app.get("/api/users", include_in_schema=False)
     async def list_users(
