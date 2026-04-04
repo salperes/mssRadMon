@@ -45,13 +45,17 @@ def _verify_cookie(value: str) -> str | None:
 
 
 async def verify_api_key(request: Request) -> None:
-    """Geçerli session cookie VEYA geçerli X-API-Key header kabul eder."""
+    """Geçerli session cookie VEYA geçerli X-API-Key header kabul eder.
+
+    API key henüz üretilmemişse (boş string) tüm isteklere izin verir
+    — ilk kurulumda dashboard ve API erişimi açık kalır.
+    """
     token = request.cookies.get(COOKIE_NAME, "")
     if _verify_cookie(token):
         return
     key = await request.app.state.config.get("api_key")
     if not key:
-        raise HTTPException(503, detail="API key henüz üretilmemiş")
+        return  # Key üretilmemiş — açık erişim
     if request.headers.get("X-API-Key") != key:
         raise HTTPException(401, detail="Geçersiz API key")
 

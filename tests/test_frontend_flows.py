@@ -530,9 +530,17 @@ class TestDeviceEndpoint:
         assert res.status_code == 200
 
     @pytest.mark.asyncio
-    async def test_device_without_auth(self, test_client: AsyncClient):
+    async def test_device_without_auth_no_key(self, test_client: AsyncClient):
+        """API key üretilmemişse auth olmadan erişim açık."""
         res = await test_client.get("/api/device")
-        assert res.status_code in (401, 503)
+        assert res.status_code == 200
+
+    @pytest.mark.asyncio
+    async def test_device_without_auth_with_key(self, test_client: AsyncClient):
+        """API key üretilmişse auth olmadan erişim reddedilir."""
+        await test_client.post("/api/apikey/generate", cookies=_admin_cookies())
+        res = await test_client.get("/api/device")
+        assert res.status_code == 401
 
 
 # ===========================================================================
@@ -583,8 +591,11 @@ class TestSettingsApi:
 
     @pytest.mark.asyncio
     async def test_put_settings_no_auth(self, test_client: AsyncClient):
+        """API key üretilmemişse auth olmadan settings erişimi açık."""
         res = await test_client.put(
             "/api/settings",
             json={"sampling_interval": "99"},
         )
-        assert res.status_code in (401, 503)
+        # Key yoksa açık erişim, ama require_admin_or_apikey cookie+admin ister
+        # Cookie yoksa 403 (admin değil) veya açık erişim
+        assert res.status_code in (200, 403)
