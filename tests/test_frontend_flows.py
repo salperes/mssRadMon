@@ -251,25 +251,37 @@ class TestApiKey:
 
         assert old_key != new_key
 
-        # Eski key ile erişim reddedilmeli
-        res = await test_client.get(
-            "/api/device",
+        # Eski key ile POST yazma isteği reddedilmeli
+        res = await test_client.put(
+            "/api/settings",
+            json={"device_name": "hacked"},
             headers={"X-API-Key": old_key},
         )
         assert res.status_code == 401
 
     @pytest.mark.asyncio
-    async def test_api_key_protects_endpoints(self, test_client: AsyncClient):
+    async def test_api_key_protects_write_endpoints(self, test_client: AsyncClient):
         gen_res = await test_client.post("/api/apikey/generate", cookies=_admin_cookies())
         key = gen_res.json()["api_key"]
 
-        # Key ile erişim
-        res = await test_client.get("/api/device", headers={"X-API-Key": key})
+        # GET (read) public — auth gerekmez
+        res = await test_client.get("/api/device")
         assert res.status_code == 200
 
-        # Key'siz erişim (cookie de yok)
-        res = await test_client.get("/api/device")
-        assert res.status_code in (401, 503)
+        # PUT (write) key ile çalışmalı
+        res = await test_client.put(
+            "/api/settings",
+            json={"device_name": "test"},
+            headers={"X-API-Key": key},
+        )
+        assert res.status_code == 200
+
+        # PUT key'siz reddedilmeli
+        res = await test_client.put(
+            "/api/settings",
+            json={"device_name": "hacked"},
+        )
+        assert res.status_code == 401
 
     @pytest.mark.asyncio
     async def test_generate_requires_auth(self, test_client: AsyncClient):
@@ -536,11 +548,11 @@ class TestDeviceEndpoint:
         assert res.status_code == 200
 
     @pytest.mark.asyncio
-    async def test_device_without_auth_with_key(self, test_client: AsyncClient):
-        """API key üretilmişse auth olmadan erişim reddedilir."""
+    async def test_device_get_always_public(self, test_client: AsyncClient):
+        """GET /api/device her zaman public — API key olsa bile."""
         await test_client.post("/api/apikey/generate", cookies=_admin_cookies())
         res = await test_client.get("/api/device")
-        assert res.status_code == 401
+        assert res.status_code == 200
 
 
 # ===========================================================================

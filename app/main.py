@@ -177,12 +177,6 @@ def create_app() -> FastAPI:
 
     @app.get("/", response_class=HTMLResponse, include_in_schema=False)
     async def dashboard_page(request: Request):
-        # API key üretilmişse cookie zorunlu — login'e yönlendir
-        api_key = await request.app.state.config.get("api_key")
-        if api_key:
-            token = request.cookies.get(COOKIE_NAME, "")
-            if not _verify_cookie(token):
-                return RedirectResponse(url="/admin/login", status_code=303)
         return templates.TemplateResponse("dashboard.html", {"request": request, "active": "dashboard"})
 
     @app.get("/admin/login", response_class=HTMLResponse, include_in_schema=False)

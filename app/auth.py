@@ -47,9 +47,13 @@ def _verify_cookie(value: str) -> str | None:
 async def verify_api_key(request: Request) -> None:
     """Geçerli session cookie VEYA geçerli X-API-Key header kabul eder.
 
-    API key henüz üretilmemişse (boş string) tüm isteklere izin verir
-    — ilk kurulumda dashboard ve API erişimi açık kalır.
+    GET istekleri auth'tan muaftır — dashboard public erişim için.
+    PUT/POST/DELETE istekleri cookie veya API key gerektirir.
+    API key henüz üretilmemişse tüm isteklere izin verir.
     """
+    # GET istekleri public — dashboard read-only erişim
+    if request.method == "GET":
+        return
     token = request.cookies.get(COOKIE_NAME, "")
     if _verify_cookie(token):
         return
