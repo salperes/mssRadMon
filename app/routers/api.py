@@ -119,7 +119,7 @@ async def get_alarms(request: Request, last: str = "24h"):
     delta = DURATION_MAP.get(last, timedelta(hours=24))
     since = (datetime.now(timezone.utc) - delta).isoformat()
     rows = await db.fetch_all(
-        "SELECT timestamp, level, dose_rate, action_taken FROM alarm_log WHERE timestamp >= ? ORDER BY timestamp DESC",
+        "SELECT timestamp, level, dose_rate, action_taken, COALESCE(exceed_duration, 0) as exceed_duration FROM alarm_log WHERE timestamp >= ? ORDER BY timestamp DESC",
         (since,),
     )
     return rows
@@ -166,4 +166,8 @@ async def get_device(request: Request):
         "device_name": await config.get("device_name") or "",
         "device_location": await config.get("device_location") or "",
         "device_serial": await config.get("device_serial") or "",
+        "threshold_high": float(await config.get("threshold_high") or "0.5"),
+        "threshold_high_high": float(await config.get("threshold_high_high") or "1.0"),
+        "threshold_high_duration": float(await config.get("threshold_high_duration") or "120"),
+        "threshold_high_high_duration": float(await config.get("threshold_high_high_duration") or "15"),
     }

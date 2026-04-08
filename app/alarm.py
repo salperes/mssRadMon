@@ -101,7 +101,7 @@ class AlarmManager:
 
         # Sure doldu — alarm tetikle
         self._active_level = new_level
-        await self._trigger_alarm(new_level, dose_rate)
+        await self._trigger_alarm(new_level, dose_rate, elapsed)
         return new_level
 
     async def get_pending_info(self) -> dict:
@@ -123,7 +123,7 @@ class AlarmManager:
             "alarm_pending_duration": round(duration),
         }
 
-    async def _trigger_alarm(self, level: AlarmLevel, dose_rate: float):
+    async def _trigger_alarm(self, level: AlarmLevel, dose_rate: float, exceed_duration: float = 0):
         """Alarm aksiyonlarini calistir."""
         actions_key = f"alarm_{level.value}_actions"
         actions_str = await self._config.get(actions_key) or ""
@@ -146,8 +146,8 @@ class AlarmManager:
         timestamp = datetime.now(timezone.utc).isoformat()
         action_taken = ",".join(actions)
         await self._db.execute(
-            "INSERT INTO alarm_log (timestamp, level, dose_rate, action_taken) VALUES (?, ?, ?, ?)",
-            (timestamp, level.value, dose_rate, action_taken),
+            "INSERT INTO alarm_log (timestamp, level, dose_rate, action_taken, exceed_duration) VALUES (?, ?, ?, ?, ?)",
+            (timestamp, level.value, dose_rate, action_taken, round(exceed_duration)),
         )
 
         # E-posta gonder
@@ -159,7 +159,7 @@ class AlarmManager:
         await self._send_msgservice_mail(level, dose_rate)
         await self._send_msgservice_wa(level, dose_rate)
 
-        logger.warning("ALARM %s: %.3f µSv/h — aksiyonlar: %s", level.value, dose_rate, action_taken)
+        logger.warning("ALARM %s: %.3f µSv/h — süre: %ds — aksiyonlar: %s", level.value, dose_rate, round(exceed_duration), action_taken)
 
     async def _clear_alarm(self):
         """Aktif alarmi temizle, GPIO'lari kapat."""

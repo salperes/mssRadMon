@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS alarm_log (
     level TEXT NOT NULL,
     dose_rate REAL NOT NULL,
     action_taken TEXT NOT NULL,
+    exceed_duration REAL DEFAULT 0,
     remote_synced INTEGER DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_alarm_ts ON alarm_log(timestamp);
