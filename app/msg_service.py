@@ -73,6 +73,7 @@ def send_mail(
     dose_rate: float,
     device_name: str,
     device_location: str,
+    device_serial: str = "",
 ) -> str | None:
     """E-posta gonder. Basarida messageId, hatada None doner."""
     if not base_url or not api_key or not to_list:
@@ -85,6 +86,8 @@ def send_mail(
         f"Zaman &nbsp;&nbsp;: {_local_time()}<br>"
         f"Cihaz &nbsp;&nbsp;: {device_name}<br>"
     )
+    if device_serial:
+        body += f"Seri No &nbsp;: {device_serial}<br>"
     if device_location:
         body += f"Lokasyon : {device_location}<br>"
 
@@ -116,6 +119,7 @@ def send_whatsapp(
     level_label: str,
     dose_rate: float,
     device_name: str,
+    device_serial: str = "",
 ) -> list[dict]:
     """Her numara icin ayri WA mesaji gonder.
     Her eleman: {"ok": bool, "phone": str, "messageId": str|None, "error": str|None}
@@ -123,10 +127,11 @@ def send_whatsapp(
     if not base_url or not api_key or not phone_list:
         return []
 
+    sn_part = f" (SN: {device_serial})" if device_serial else ""
     body = (
         f"[mssRadMon] ALARM {level_label}\n"
         f"Doz: {dose_rate:.3f} µSv/h | {_local_time()}\n"
-        f"Cihaz: {device_name}"
+        f"Cihaz: {device_name}{sn_part}"
     )
 
     results: list[dict] = []

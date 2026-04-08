@@ -198,8 +198,14 @@ class AlarmManager:
                 logger.warning("E-posta ayarlari eksik, gonderilemiyor")
                 return
 
+            device_name = await self._config.get("device_name") or "GammaScout-01"
+            device_serial = await self._config.get("device_serial") or ""
+            device_location = await self._config.get("device_location") or ""
+            loc_line = f"Lokasyon: {device_location}\n" if device_location else ""
+            sn_line = f"Seri No: {device_serial}\n" if device_serial else ""
+
             msg = EmailMessage()
-            msg["Subject"] = f"[mssRadMon] ALARM {level.value.upper()}: {dose_rate:.3f} µSv/h"
+            msg["Subject"] = f"[{device_name}] ALARM {level.value.upper()}: {dose_rate:.3f} µSv/h"
             msg["From"] = user
             msg["To"] = to_addr
             msg.set_content(
@@ -207,7 +213,9 @@ class AlarmManager:
                 f"Seviye: {level.value.upper()}\n"
                 f"Doz Hizi: {dose_rate:.3f} µSv/h\n"
                 f"Zaman: {_local_time()}\n"
-                f"Cihaz: GSNJR400"
+                f"Cihaz: {device_name}\n"
+                f"{sn_line}"
+                f"{loc_line}"
             )
 
             loop = asyncio.get_event_loop()
@@ -281,13 +289,14 @@ class AlarmManager:
             return
         device_name = await self._config.get("device_name") or "GammaScout-01"
         device_location = await self._config.get("device_location") or ""
+        device_serial = await self._config.get("device_serial") or ""
         label = level.value.upper().replace("_", "-")
         loop = asyncio.get_event_loop()
         msg_id = await loop.run_in_executor(
             None,
             lambda: msg_service.send_mail(
                 base_url, api_key, to_list, reply_to,
-                label, dose_rate, device_name, device_location,
+                label, dose_rate, device_name, device_location, device_serial,
             ),
         )
         if msg_id:
@@ -306,12 +315,13 @@ class AlarmManager:
         if not phone_list:
             return
         device_name = await self._config.get("device_name") or "GammaScout-01"
+        device_serial = await self._config.get("device_serial") or ""
         label = level.value.upper().replace("_", "-")
         loop = asyncio.get_event_loop()
         results = await loop.run_in_executor(
             None,
             lambda: msg_service.send_whatsapp(
-                base_url, api_key, phone_list, label, dose_rate, device_name,
+                base_url, api_key, phone_list, label, dose_rate, device_name, device_serial,
             ),
         )
         sent = sum(1 for r in results if r["ok"])
