@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from typing import Callable, Awaitable
 
 import serial
+from serial.tools import list_ports
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +21,10 @@ DEFAULT_BAUDRATE = 460800
 BYTESIZE = serial.SEVENBITS
 PARITY = serial.PARITY_EVEN
 STOPBITS = serial.STOPBITS_ONE
+
+# GammaScout USB kimliği (FTDI)
+GAMMASCOUT_VID = 0x0403
+GAMMASCOUT_PID = 0xD678
 
 # Komutlar (en az 550ms aralıkla gönderilmeli)
 CMD_PC_MODE = b"P"
@@ -88,8 +93,31 @@ class GammaScoutReader:
         data = self._serial.read(self._serial.in_waiting or 256)
         return data
 
+    @staticmethod
+    def _find_port_by_vid_pid() -> str | None:
+        """VID:PID ile GammaScout portunu otomatik bul."""
+        for port in list_ports.comports():
+            if port.vid == GAMMASCOUT_VID and port.pid == GAMMASCOUT_PID:
+                return port.device
+        return None
+
     def connect(self) -> bool:
-        """Serial porta bağlan."""
+        """Serial porta bağlan. Port yoksa VID:PID ile otomatik algıla."""
+        import os
+        if not os.path.exists(self.port):
+            detected = self._find_port_by_vid_pid()
+            if detected:
+                logger.info(
+                    "Port '%s' bulunamadı, otomatik algılandı: %s "
+                    "(udev rule için: SUBSYSTEM==\"tty\", ATTRS{idVendor}==\"0403\", "
+                    "ATTRS{idProduct}==\"d678\", SYMLINK+=\"ttyGammaScout\")",
+                    self.port, detected,
+                )
+                self.port = detected
+            else:
+                logger.error("GammaScout bulunamadı (port=%s, VID:PID=%04x:%04x)", self.port, GAMMASCOUT_VID, GAMMASCOUT_PID)
+                self._connected = False
+                return False
         try:
             self._serial = serial.Serial(
                 port=self.port,

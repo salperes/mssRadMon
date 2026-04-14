@@ -40,6 +40,8 @@ DEFAULTS: dict[str, str] = {
     "ca_server_url": "",
     "ca_api_key": "",
     "ssl_enabled": "false",
+    "manager_url": "",
+    "manager_register_token": "",
 }
 
 

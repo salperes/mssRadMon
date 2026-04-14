@@ -31,6 +31,7 @@ from app.serial_reader import GammaScoutReader, Reading
 from app.shift import ShiftManager
 from app.ssl import SslManager
 from app import wifi
+from app.register import run_register_loop
 
 logging.basicConfig(
     level=logging.INFO,
@@ -148,6 +149,7 @@ def create_app() -> FastAPI:
         reader_task = asyncio.create_task(reader.run(interval=interval))
         sync_task = asyncio.create_task(remote_log.run_sync_loop(interval=60))
         wifi_task = asyncio.create_task(wifi.auto_connect_loop(config, alarm_manager))
+        register_task = asyncio.create_task(run_register_loop(config))
 
         logger.info("mssRadMon başlatıldı — interval=%ds", interval)
         yield
@@ -157,6 +159,7 @@ def create_app() -> FastAPI:
         reader_task.cancel()
         sync_task.cancel()
         wifi_task.cancel()
+        register_task.cancel()
         alarm_manager.shutdown()
         await db.close()
         logger.info("mssRadMon kapatıldı")
