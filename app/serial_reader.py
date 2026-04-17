@@ -152,6 +152,9 @@ class GammaScoutReader:
             self._serial.write(bytes([ch]))
             time.sleep(CMD_CHAR_DELAY)
         time.sleep(CMD_DELAY)
+        # Cihaz yanıtını oku — buffer'da kalıp sonraki komutları bozmasın
+        if self._serial.in_waiting:
+            self._serial.read(self._serial.in_waiting)
         logger.info("GammaScout saati senkronize edildi: %s", time_str)
 
     def _query_version(self) -> DeviceInfo | None:
