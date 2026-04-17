@@ -31,7 +31,9 @@ CMD_PC_MODE = b"P"
 CMD_EXIT = b"X"
 CMD_VERSION = b"v"
 CMD_ONLINE_DOSE_RATE = b"R"
+CMD_SET_TIME = b"t"
 CMD_DELAY = 0.6  # 550ms + marj
+CMD_CHAR_DELAY = 0.002  # parametre karakterleri arası 1-2ms
 
 
 @dataclass
@@ -135,13 +137,31 @@ class GammaScoutReader:
             self._connected = False
             return False
 
+    def _sync_time(self):
+        """Cihaz saatini sistem saatiyle senkronize et (PC modunda çağrılmalı).
+
+        Format: DDMMYYhhmmss — parametre karakterleri 1-2ms aralıkla gönderilir.
+        """
+        if not self._serial or not self._serial.is_open:
+            return
+        import time
+        now = datetime.now()
+        time_str = now.strftime("%d%m%y%H%M%S")
+        self._send_command(CMD_SET_TIME)
+        for ch in time_str.encode("ascii"):
+            self._serial.write(bytes([ch]))
+            time.sleep(CMD_CHAR_DELAY)
+        time.sleep(CMD_DELAY)
+        logger.info("GammaScout saati senkronize edildi: %s", time_str)
+
     def _query_version(self) -> DeviceInfo | None:
-        """PC moduna girip versiyon/seri no alıp çık."""
+        """PC moduna girip versiyon/seri no alıp, saati senkronize edip çık."""
         if not self._serial:
             return None
         try:
             self._send_command(CMD_PC_MODE)
             resp = self._send_command(CMD_VERSION)
+            self._sync_time()
             self._send_command(CMD_EXIT)
             return self._parse_version(resp)
         except serial.SerialException as e:
