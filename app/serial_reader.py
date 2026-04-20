@@ -6,6 +6,7 @@ Mod: Dose rate online — 'R' komutu ile girilir, periyodik doz hızı çıktıs
 """
 import asyncio
 import logging
+import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Callable, Awaitable
@@ -262,13 +263,14 @@ class GammaScoutReader:
             logger.warning("Version parse hatası: %s (raw: %s)", e, raw)
             return None
 
+    # Tam GammaScout online format: "0,166 uSv/h" — virgüllü ondalık, en az 1 basamak
+    _DOSE_RE = re.compile(r"^(\d+,\d+)\s+uSv/h\s*$")
+
     def parse_online_data(self, raw: bytes) -> float | None:
         """Online mod çıktısını parse edip dose rate (µSv/h) döndür.
 
         Gerçek cihaz formatı: "0,166 uSv/h\r\n"
-        - Virgüllü ondalık ayırıcı (Alman formatı)
-        - Birim stringi sonunda
-        - Birden fazla satır gelebilir
+        Regex ile tam format doğrulama yapılır — parçalı/bozuk satırlar reddedilir.
         """
         if not raw:
             return None
@@ -278,38 +280,43 @@ class GammaScoutReader:
                 return None
             for line in reversed(text.splitlines()):
                 line = line.strip()
-                if not line:
+                m = self._DOSE_RE.match(line)
+                if not m:
                     continue
-                # "0,166 uSv/h" formatı: ilk kelimeyi al, virgülü noktaya çevir
-                parts = line.split()
-                if not parts:
-                    continue
-                number_str = parts[0].replace(",", ".")
-                try:
-                    return float(number_str)
-                except ValueError:
-                    continue
+                value = float(m.group(1).replace(",", "."))
+                if 0 <= value <= 1000:
+                    return value
+                logger.warning("Aralık dışı değer: %.3f", value)
             return None
         except Exception as e:
             logger.warning("Online data parse hatası: %s", e)
             return None
 
     def read_once(self) -> float | None:
-        """Serial porttan bir satır oku ve dose rate döndür.
+        """Serial porttan en güncel doz hızını oku.
 
-        Serial timeout (2s) kadar bekler. Cihaz periyodik olarak veri
-        gönderiyorsa bu sürede yakalar.
+        Cihaz ~1s aralıkla veri gönderir, biz 10-15s aralıkla okuruz.
+        Buffer'daki eski satırları atıp en son satırı alır.
         """
         if not self._serial or not self._serial.is_open:
             return None
         try:
-            raw = self._serial.readline()
-            if not raw:
+            # Buffer'daki birikmiş eski verileri at, sadece en güncelini al
+            last_raw = None
+            # Önce buffer'daki tüm hazır satırları oku
+            while self._serial.in_waiting:
+                line = self._serial.readline()
+                if line:
+                    last_raw = line
+            # Eğer buffer boşsa, bir sonraki satırı bekle (timeout=2s)
+            if last_raw is None:
+                last_raw = self._serial.readline()
+            if not last_raw:
                 logger.debug("readline boş döndü (timeout)")
                 return None
-            value = self.parse_online_data(raw)
+            value = self.parse_online_data(last_raw)
             if value is None:
-                logger.warning("Parse edilemeyen serial veri: %s", raw)
+                logger.warning("Parse edilemeyen serial veri: %s", last_raw)
             return value
         except serial.SerialException as e:
             logger.error("Okuma hatası: %s", e)
