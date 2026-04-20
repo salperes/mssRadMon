@@ -85,6 +85,13 @@ class GammaScoutReader:
         """Yeni okuma geldiğinde çağrılacak async callback'i ata."""
         self._on_reading = callback
 
+    def _flush_input(self):
+        """Serial giriş buffer'ını temizle."""
+        if self._serial and self._serial.is_open and self._serial.in_waiting:
+            discarded = self._serial.read(self._serial.in_waiting)
+            if discarded:
+                logger.debug("Serial buffer temizlendi: %d byte", len(discarded))
+
     def _send_command(self, cmd: bytes) -> bytes:
         """Komut gönder, yanıt oku. 550ms bekleme kuralına uyar."""
         if not self._serial or not self._serial.is_open:
@@ -162,11 +169,26 @@ class GammaScoutReader:
         if not self._serial:
             return None
         try:
+            self._flush_input()
             self._send_command(CMD_PC_MODE)
+            # P yanıtı geç gelebilir, ekstra bekle ve buffer'ı temizle
+            import time
+            time.sleep(CMD_DELAY)
+            self._flush_input()
             resp = self._send_command(CMD_VERSION)
+            info = self._parse_version(resp)
+            if not info:
+                # Version yanıtı geç geldiyse tekrar oku
+                time.sleep(CMD_DELAY)
+                extra = self._serial.read(self._serial.in_waiting or 256) if self._serial.in_waiting else b""
+                if extra:
+                    info = self._parse_version(resp + extra)
             self._sync_time()
             self._send_command(CMD_EXIT)
-            return self._parse_version(resp)
+            # Exit sonrası buffer'ı temizle
+            time.sleep(CMD_DELAY)
+            self._flush_input()
+            return info
         except serial.SerialException as e:
             logger.warning("Version sorgusu hatası: %s", e)
             return None
@@ -176,9 +198,21 @@ class GammaScoutReader:
         if not self._serial:
             return False
         try:
+            self._flush_input()
             resp = self._send_command(CMD_ONLINE_DOSE_RATE)
             logger.info("Online mode yanıtı: %s", resp)
-            return True
+            # İlk okumayı doğrula — cihaz gerçekten online modda mı?
+            if resp and b"uSv/h" in resp:
+                return True
+            # Yanıt boş veya beklenmedikse kısa bekle ve tekrar kontrol et
+            import time
+            time.sleep(2)
+            check = self._serial.read(self._serial.in_waiting or 256) if self._serial.in_waiting else b""
+            if check and b"uSv/h" in check:
+                logger.info("Online mode doğrulandı (gecikmeli): %s", check)
+                return True
+            logger.warning("Online mode yanıtında doz verisi bulunamadı: resp=%s check=%s", resp, check)
+            return True  # yine de dene, belki sonraki okumada gelir
         except serial.SerialException as e:
             logger.error("Online mod geçiş hatası: %s", e)
             return False
@@ -271,8 +305,12 @@ class GammaScoutReader:
         try:
             raw = self._serial.readline()
             if not raw:
+                logger.debug("readline boş döndü (timeout)")
                 return None
-            return self.parse_online_data(raw)
+            value = self.parse_online_data(raw)
+            if value is None:
+                logger.warning("Parse edilemeyen serial veri: %s", raw)
+            return value
         except serial.SerialException as e:
             logger.error("Okuma hatası: %s", e)
             self._connected = False
@@ -338,6 +376,7 @@ class GammaScoutReader:
                         logger.error("Reading callback hatası: %s", e)
             else:
                 _consecutive_failures += 1
+                logger.debug("Okuma boş döndü (ardışık: %d/3)", _consecutive_failures)
                 if not self._connected or _consecutive_failures >= 3:
                     logger.warning("Okuma başarısız (%d), yeniden bağlanılıyor...", _consecutive_failures)
                     self.disconnect()
