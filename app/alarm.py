@@ -41,6 +41,7 @@ class AlarmManager:
         self._buzzer_task: asyncio.Task | None = None
         self._exceed_start: float | None = None
         self._exceed_level: AlarmLevel | None = None
+        self._active_alarm_id: int | None = None
 
     async def init(self):
         """GPIO cihazlarini baslat."""
@@ -95,13 +96,14 @@ class AlarmManager:
         if elapsed < required_dur:
             return None
 
-        # Zaten ayni seviyede aktif alarm varsa tekrar tetikleme
+        # Zaten ayni seviyede aktif alarm varsa — exceed_duration guncelle
         if self._active_level == new_level:
+            await self._update_exceed_duration(elapsed)
             return None
 
         # Sure doldu — alarm tetikle
         self._active_level = new_level
-        await self._trigger_alarm(new_level, dose_rate, elapsed)
+        self._active_alarm_id = await self._trigger_alarm(new_level, dose_rate, elapsed)
         return new_level
 
     async def get_pending_info(self) -> dict:
@@ -123,8 +125,8 @@ class AlarmManager:
             "alarm_pending_duration": round(duration),
         }
 
-    async def _trigger_alarm(self, level: AlarmLevel, dose_rate: float, exceed_duration: float = 0):
-        """Alarm aksiyonlarini calistir."""
+    async def _trigger_alarm(self, level: AlarmLevel, dose_rate: float, exceed_duration: float = 0) -> int | None:
+        """Alarm aksiyonlarini calistir. Alarm log row ID dondurur."""
         actions_key = f"alarm_{level.value}_actions"
         actions_str = await self._config.get(actions_key) or ""
         actions = [a.strip() for a in actions_str.split(",") if a.strip()]
@@ -145,7 +147,7 @@ class AlarmManager:
         # DB'ye kaydet
         timestamp = datetime.now(timezone.utc).isoformat()
         action_taken = ",".join(actions)
-        await self._db.execute(
+        row_id = await self._db.execute(
             "INSERT INTO alarm_log (timestamp, level, dose_rate, action_taken, exceed_duration) VALUES (?, ?, ?, ?, ?)",
             (timestamp, level.value, dose_rate, action_taken, round(exceed_duration)),
         )
@@ -160,9 +162,23 @@ class AlarmManager:
         await self._send_msgservice_wa(level, dose_rate)
 
         logger.warning("ALARM %s: %.3f µSv/h — süre: %ds — aksiyonlar: %s", level.value, dose_rate, round(exceed_duration), action_taken)
+        return row_id
+
+    async def _update_exceed_duration(self, elapsed: float):
+        """Aktif alarm kaydinin exceed_duration'ini guncelle."""
+        if not self._active_alarm_id:
+            return
+        await self._db.execute(
+            "UPDATE alarm_log SET exceed_duration = ? WHERE id = ?",
+            (round(elapsed), self._active_alarm_id),
+        )
 
     async def _clear_alarm(self):
         """Aktif alarmi temizle, GPIO'lari kapat."""
+        # Kapanmadan once son exceed_duration'i kaydet
+        if self._exceed_start is not None and self._active_alarm_id:
+            final_elapsed = time.monotonic() - self._exceed_start
+            await self._update_exceed_duration(final_elapsed)
         if self._buzzer_task:
             self._buzzer_task.cancel()
             self._buzzer_task = None
@@ -170,6 +186,7 @@ class AlarmManager:
             device.off()
         logger.info("Alarm temizlendi (onceki seviye: %s)", self._active_level)
         self._active_level = None
+        self._active_alarm_id = None
 
     async def _buzzer_pattern_high(self):
         """High alarm buzzer pattern: 1s acik, 5s kapali."""
