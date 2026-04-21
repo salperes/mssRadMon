@@ -41,6 +41,7 @@ class AlarmManager:
         self._buzzer_task: asyncio.Task | None = None
         self._exceed_start: float | None = None
         self._exceed_level: AlarmLevel | None = None
+        self._alarm_exceed_start_mono: float | None = None  # alarm tetiklendiğindeki exceed_start
         self._active_alarm_id: int | None = None
 
     async def init(self):
@@ -161,6 +162,8 @@ class AlarmManager:
         await self._send_msgservice_mail(level, dose_rate)
         await self._send_msgservice_wa(level, dose_rate)
 
+        # Alarm temizlendiğinde toplam süreyi hesaplamak için exceed_start'ı sakla
+        self._alarm_exceed_start_mono = self._exceed_start
         logger.warning("ALARM %s: %.3f µSv/h — süre: %ds — aksiyonlar: %s", level.value, dose_rate, round(exceed_duration), action_taken)
         return row_id
 
@@ -176,9 +179,11 @@ class AlarmManager:
     async def _clear_alarm(self):
         """Aktif alarmi temizle, GPIO'lari kapat."""
         # Kapanmadan once son exceed_duration'i kaydet
-        if self._exceed_start is not None and self._active_alarm_id:
-            final_elapsed = time.monotonic() - self._exceed_start
+        if self._alarm_exceed_start_mono is not None and self._active_alarm_id:
+            final_elapsed = time.monotonic() - self._alarm_exceed_start_mono
             await self._update_exceed_duration(final_elapsed)
+            logger.info("Alarm toplam aşım süresi: %ds", round(final_elapsed))
+        self._alarm_exceed_start_mono = None
         if self._buzzer_task:
             self._buzzer_task.cancel()
             self._buzzer_task = None
