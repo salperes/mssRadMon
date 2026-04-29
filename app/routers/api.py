@@ -125,6 +125,14 @@ async def get_alarms(request: Request, last: str = "24h"):
     return rows
 
 
+@router.post("/alarm/silence")
+async def silence_alarm(request: Request):
+    """Aktif alarm event icin GPIO cikislarini sustur. Idempotent."""
+    alarm = request.app.state.alarm
+    result = await alarm.silence_outputs()
+    return result
+
+
 @router.get("/shift/current")
 async def get_shift_current(request: Request):
     """Aktif vardiya ve anlik doz."""
