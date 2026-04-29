@@ -44,6 +44,7 @@ class AlarmManager:
         self._exceed_level: AlarmLevel | None = None
         self._alarm_exceed_start_mono: float | None = None  # alarm tetiklendiğindeki exceed_start
         self._active_alarm_id: int | None = None
+        self._silenced: bool = False
 
     async def init(self):
         """GPIO cihazlarini baslat."""
@@ -198,6 +199,22 @@ class AlarmManager:
         logger.info("Alarm temizlendi (onceki seviye: %s)", self._active_level)
         self._active_level = None
         self._active_alarm_id = None
+        self._silenced = False
+
+    async def silence_outputs(self) -> dict:
+        """Aktif alarm event icin GPIO ciksilarini OFF. Idempotent."""
+        if self._active_level is None:
+            return {"silenced": False, "event_id": None}
+
+        self._silenced = True
+        if self._buzzer_task:
+            self._buzzer_task.cancel()
+            self._buzzer_task = None
+        for device in self._gpio_devices.values():
+            device.off()
+
+        logger.info("Alarm cikislari operator tarafindan susturuldu (event_id=%s)", self._active_alarm_id)
+        return {"silenced": True, "event_id": self._active_alarm_id}
 
     async def _buzzer_pattern_high(self):
         """High alarm buzzer pattern: 1s acik, 5s kapali."""
