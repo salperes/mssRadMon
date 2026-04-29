@@ -30,6 +30,7 @@ except ImportError:
 class AlarmLevel(Enum):
     HIGH = "high"
     HIGH_HIGH = "high_high"
+    CRITICAL = "critical"
 
 
 class AlarmManager:
@@ -63,8 +64,10 @@ class AlarmManager:
         """Doz hizini kontrol et. Sure dolunca alarm tetikle."""
         high = float(await self._config.get("threshold_high") or "0.5")
         high_high = float(await self._config.get("threshold_high_high") or "1.0")
+        critical = float(await self._config.get("threshold_critical") or "10.0")
         high_dur = float(await self._config.get("threshold_high_duration") or "120")
         high_high_dur = float(await self._config.get("threshold_high_high_duration") or "15")
+        critical_dur = float(await self._config.get("threshold_critical_duration") or "5")
 
         # Esik altina dustuyse sayaci sifirla ve temizle
         if dose_rate < high:
@@ -74,8 +77,11 @@ class AlarmManager:
                 await self._clear_alarm()
             return None
 
-        # Seviyeyi belirle
-        if dose_rate >= high_high:
+        # Seviyeyi belirle (CRITICAL > HIGH_HIGH > HIGH)
+        if dose_rate >= critical:
+            new_level = AlarmLevel.CRITICAL
+            required_dur = critical_dur
+        elif dose_rate >= high_high:
             new_level = AlarmLevel.HIGH_HIGH
             required_dur = high_high_dur
         else:
