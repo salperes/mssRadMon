@@ -32,9 +32,9 @@ showSection(initSection);
 const FIELDS = [
     "device_name", "device_location", "device_serial",
     "sampling_interval", "calibration_factor",
-    "threshold_high", "threshold_high_high",
-    "threshold_high_duration", "threshold_high_high_duration",
-    "alarm_high_actions", "alarm_high_high_actions",
+    "threshold_high", "threshold_high_high", "threshold_critical",
+    "threshold_high_duration", "threshold_high_high_duration", "threshold_critical_duration",
+    "alarm_high_actions", "alarm_high_high_actions", "alarm_critical_actions",
     "gpio_buzzer_pin", "gpio_light_pin", "gpio_emergency_pin",
     "alarm_buzzer_enabled", "alarm_email_enabled",
     "alarm_email_to", "smtp_host", "smtp_port", "smtp_user", "smtp_pass",

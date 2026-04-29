@@ -87,6 +87,14 @@
                         <label for="threshold_high_high_duration">High-High Süresi (sn)</label>
                         <input type="number" id="threshold_high_high_duration" min="0" step="1">
                     </div>
+                    <div class="form-group">
+                        <label for="threshold_critical">Critical Eşiği (µSv/h)</label>
+                        <input type="number" id="threshold_critical" step="0.1" min="5" max="1000000">
+                    </div>
+                    <div class="form-group">
+                        <label for="threshold_critical_duration">Critical Süresi (sn)</label>
+                        <input type="number" id="threshold_critical_duration" min="1" max="10" step="1">
+                    </div>
                 </div>
                 <div class="dashboard-grid">
                     <div class="form-group">
@@ -96,6 +104,10 @@
                     <div class="form-group">
                         <label for="alarm_high_high_actions">High-High Aksiyonları</label>
                         <input type="text" id="alarm_high_high_actions" placeholder="buzzer,light,emergency">
+                    </div>
+                    <div class="form-group">
+                        <label for="alarm_critical_actions">Critical Aksiyonları</label>
+                        <input type="text" id="alarm_critical_actions" placeholder="buzzer,light,emergency" readonly title="Critical her zaman tüm çıkışları aktive eder">
                     </div>
                 </div>
             </div>
