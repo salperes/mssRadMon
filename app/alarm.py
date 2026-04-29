@@ -139,18 +139,22 @@ class AlarmManager:
         actions_str = await self._config.get(actions_key) or ""
         actions = [a.strip() for a in actions_str.split(",") if a.strip()]
 
-        # GPIO cikislarini aktifle
-        for action in actions:
-            if action in self._gpio_devices:
-                self._gpio_devices[action].on()
+        # CRITICAL icin: tum GPIO cikislari config'den bagimsiz aktif olur
+        if level == AlarmLevel.CRITICAL:
+            actions = ["buzzer", "light", "emergency"]
 
-        # Buzzer pattern'i baslat
-        if "buzzer" in actions:
-            if self._buzzer_task:
-                self._buzzer_task.cancel()
-            if level == AlarmLevel.HIGH:
-                self._buzzer_task = asyncio.create_task(self._buzzer_pattern_high())
-            # HIGH_HIGH: buzzer surekli acik kalir (on() zaten cagirildi)
+        # Silence flag aktifse GPIO cikislarini etkinlestirme
+        if not self._silenced:
+            for action in actions:
+                if action in self._gpio_devices:
+                    self._gpio_devices[action].on()
+
+            if "buzzer" in actions:
+                if self._buzzer_task:
+                    self._buzzer_task.cancel()
+                if level == AlarmLevel.HIGH:
+                    self._buzzer_task = asyncio.create_task(self._buzzer_pattern_high())
+                # HIGH_HIGH ve CRITICAL: buzzer surekli acik kalir
 
         # DB'ye kaydet
         timestamp = datetime.now(timezone.utc).isoformat()
