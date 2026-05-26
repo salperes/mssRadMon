@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from app.alarm import AlarmManager
+from app.relay import RelayBoard
 from app.auth import (
     _hash_password,
     _sign_cookie,
@@ -67,7 +68,16 @@ def create_app() -> FastAPI:
             )
             logger.info("İlk kullanıcı oluşturuldu: mssadmin (admin)")
 
-        alarm_manager = AlarmManager(db=db, config=config)
+        # Waveshare RPi Relay Board (3 kanal, active-low)
+        # CH1=BCM26, CH2=BCM20, CH3=BCM21 (DB'de override edilebilir)
+        relay_channels = {
+            "buzzer": int(await config.get("gpio_buzzer_pin") or "26"),
+            "light": int(await config.get("gpio_light_pin") or "20"),
+            "emergency": int(await config.get("gpio_emergency_pin") or "21"),
+        }
+        relay = RelayBoard(relay_channels)
+
+        alarm_manager = AlarmManager(db=db, config=config, relay=relay)
         await alarm_manager.init()
 
         shift_manager = ShiftManager(db=db, config=config)
@@ -87,6 +97,7 @@ def create_app() -> FastAPI:
         # App state'e ata
         app.state.db = db
         app.state.config = config
+        app.state.relay = relay
         app.state.alarm = alarm_manager
         app.state.remote_log = remote_log
         app.state.shift_manager = shift_manager
@@ -161,6 +172,7 @@ def create_app() -> FastAPI:
         wifi_task.cancel()
         register_task.cancel()
         alarm_manager.shutdown()
+        relay.close()
         await db.close()
         logger.info("mssRadMon kapatıldı")
 

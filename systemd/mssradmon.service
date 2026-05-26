@@ -4,9 +4,9 @@ After=network.target
 
 [Service]
 Type=simple
-User=alper
-WorkingDirectory=/home/alper/mssRadMon
-ExecStart=/home/alper/mssRadMon/.venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8090
+User=mssadmin
+WorkingDirectory=/home/mssadmin/mssRadMon
+ExecStart=/home/mssadmin/mssRadMon/.venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8090
 Restart=on-failure
 RestartSec=5
 StandardOutput=journal

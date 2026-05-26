@@ -1,10 +1,12 @@
 """Admin API endpointleri — ayar yönetimi ve WiFi kontrolü."""
 import asyncio
 
-from fastapi import APIRouter, Request, Depends
+from fastapi import APIRouter, HTTPException, Request, Depends
 
 from app import msg_service, wifi
 from app.auth import verify_api_key, require_admin_or_apikey
+
+RELAY_CHANNELS = ("buzzer", "light", "emergency")
 
 router = APIRouter(prefix="/api", tags=["admin"], dependencies=[Depends(verify_api_key)])
 
@@ -30,6 +32,37 @@ async def test_email(request: Request):
     """Test e-postası gönder."""
     alarm = request.app.state.alarm
     return await alarm.send_test_email()
+
+
+@router.get("/relay/state")
+async def relay_state(request: Request):
+    """Tüm röle kanallarının anlık durumunu döndür."""
+    relay = request.app.state.relay
+    return {name: relay.is_on(name) for name in RELAY_CHANNELS if relay.has(name)}
+
+
+@router.post("/relay/test", dependencies=[Depends(require_admin_or_apikey)])
+async def relay_test(request: Request, body: dict):
+    """Tek bir röle kanalını manuel olarak çek/bırak.
+
+    Aktif alarm varken röleleri elle değiştirmek alarm çıkışlarıyla çakışır;
+    bu durumda 409 dönülür. Operatör önce alarmı temizlemeli.
+    """
+    name = (body.get("name") or "").strip()
+    if name not in RELAY_CHANNELS:
+        raise HTTPException(400, detail=f"Geçersiz kanal (beklenen: {','.join(RELAY_CHANNELS)})")
+    on = bool(body.get("on"))
+
+    alarm = request.app.state.alarm
+    if alarm._active_level is not None:
+        raise HTTPException(409, detail="Aktif alarm var — manuel röle testi kapalı")
+
+    relay = request.app.state.relay
+    if not relay.has(name):
+        raise HTTPException(404, detail=f"'{name}' kanalı yapılandırılmamış")
+
+    relay.set(name, on)
+    return {"ok": True, "name": name, "on": relay.is_on(name)}
 
 
 @router.get("/wifi/status")
