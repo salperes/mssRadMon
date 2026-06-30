@@ -6,6 +6,9 @@ After=network.target
 Type=simple
 User=mssadmin
 WorkingDirectory=/home/mssadmin/mssRadMon
+# Auto-register icin manager adresi/token buradan gelir (image'a bir kez yazilir).
+# "-" prefix: dosya yoksa servis yine de baslar.
+EnvironmentFile=-/etc/default/mssradmon
 ExecStart=/home/mssadmin/mssRadMon/.venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8090
 Restart=on-failure
 RestartSec=5

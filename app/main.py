@@ -4,6 +4,7 @@ import logging
 import os
 import secrets
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 
 import aiosqlite
 from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
@@ -126,6 +127,7 @@ def create_app() -> FastAPI:
             pending_info = await alarm_manager.get_pending_info()
             msg = {
                 "type": "reading",
+                "connected": reader.connected,
                 "timestamp": reading.timestamp,
                 "dose_rate": reading.dose_rate,
                 "cumulative_dose": reading.cumulative_dose,
@@ -151,6 +153,30 @@ def create_app() -> FastAPI:
 
         reader.on_reading(on_reading)
 
+        async def heartbeat_loop(period: int = 20):
+            """Okuma akışından bağımsız periyodik durum frame'i gönder.
+
+            Dedektör kopukken (reader.connected=False) okuma push'u olmadığı için
+            manager bağlantıyı stale sayıp OFFLINE'a düşürür. Bu döngü, okuma olsun
+            olmasın `connected` bilgisini taşıyan bir heartbeat yollayarak hem
+            bağlantıyı canlı tutar hem de manager'ın DETECTOR_DISCONNECTED durumunu
+            doğru göstermesini sağlar.
+            """
+            while True:
+                await asyncio.sleep(period)
+                if not app.state.ws_clients:
+                    continue
+                msg = {
+                    "type": "heartbeat",
+                    "connected": reader.connected,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                }
+                for client in list(app.state.ws_clients):
+                    try:
+                        await client.send_json(msg)
+                    except Exception:
+                        app.state.ws_clients.discard(client)
+
         # Kalibrasyon faktörünü serial reader'a aktar
         cal_factor_str = await config.get("calibration_factor") or "1.0"
         reader.calibration_factor = float(cal_factor_str)
@@ -161,6 +187,7 @@ def create_app() -> FastAPI:
         sync_task = asyncio.create_task(remote_log.run_sync_loop(interval=60))
         wifi_task = asyncio.create_task(wifi.auto_connect_loop(config, alarm_manager))
         register_task = asyncio.create_task(run_register_loop(config))
+        heartbeat_task = asyncio.create_task(heartbeat_loop())
 
         logger.info("mssRadMon başlatıldı — interval=%ds", interval)
         yield
@@ -171,6 +198,7 @@ def create_app() -> FastAPI:
         sync_task.cancel()
         wifi_task.cancel()
         register_task.cancel()
+        heartbeat_task.cancel()
         alarm_manager.shutdown()
         relay.close()
         await db.close()
