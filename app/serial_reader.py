@@ -112,22 +112,25 @@ class GammaScoutReader:
         return None
 
     def connect(self) -> bool:
-        """Serial porta bağlan. Port yoksa VID:PID ile otomatik algıla."""
+        """Serial porta bağlan.
+
+        VID:PID öncelikli: USB çıkarılıp tekrar takıldığında kernel cihaza yeni bir
+        ttyUSBn numarası verebilir, bu yüzden her bağlanmada gerçek cihaz portunu
+        baştan ara. Sadece tarama hiç sonuç vermezse self.port'a düş.
+        """
         import os
-        if not os.path.exists(self.port):
-            detected = self._find_port_by_vid_pid()
-            if detected:
-                logger.info(
-                    "Port '%s' bulunamadı, otomatik algılandı: %s "
-                    "(udev rule için: SUBSYSTEM==\"tty\", ATTRS{idVendor}==\"0403\", "
-                    "ATTRS{idProduct}==\"d678\", SYMLINK+=\"ttyGammaScout\")",
-                    self.port, detected,
-                )
-                self.port = detected
-            else:
-                logger.error("GammaScout bulunamadı (port=%s, VID:PID=%04x:%04x)", self.port, GAMMASCOUT_VID, GAMMASCOUT_PID)
-                self._connected = False
-                return False
+        detected = self._find_port_by_vid_pid()
+        if detected:
+            if detected != self.port:
+                logger.info("GammaScout portu güncellendi: %s -> %s", self.port, detected)
+            self.port = detected
+        elif not os.path.exists(self.port):
+            logger.error(
+                "GammaScout bulunamadı (port=%s, VID:PID=%04x:%04x)",
+                self.port, GAMMASCOUT_VID, GAMMASCOUT_PID,
+            )
+            self._connected = False
+            return False
         try:
             self._serial = serial.Serial(
                 port=self.port,
@@ -140,7 +143,7 @@ class GammaScoutReader:
             self._connected = True
             logger.info("GammaScout bağlantısı kuruldu: %s @ %d", self.port, self.baudrate)
             return True
-        except serial.SerialException as e:
+        except (serial.SerialException, OSError) as e:
             logger.error("Serial bağlantı hatası: %s", e)
             self._connected = False
             return False
@@ -318,21 +321,36 @@ class GammaScoutReader:
             if value is None:
                 logger.warning("Parse edilemeyen serial veri: %s", last_raw)
             return value
-        except serial.SerialException as e:
+        except (serial.SerialException, OSError) as e:
+            # USB unplug sırasında pyserial bazen ham OSError fırlatır; yakalanmazsa
+            # executor exception'ı asyncio run() döngüsüne sızar ve reader_task ölür.
             logger.error("Okuma hatası: %s", e)
             self._connected = False
             return None
 
     def disconnect(self):
-        """Online moddan çık ve bağlantıyı kapat."""
-        if self._serial and self._serial.is_open:
+        """Online moddan çık ve bağlantıyı kapat.
+
+        USB cihaz fiziksel olarak çekilmişse write OSError atabilir; close yine de
+        çağrılmalı ve self._serial referansı düşmeli — aksi halde sonraki connect()
+        eski fd ile çakışıp yanlış porta bağlanabilir.
+        """
+        if self._serial:
             try:
-                self._serial.write(CMD_EXIT)
-                import time
-                time.sleep(CMD_DELAY)
-                self._serial.close()
-            except serial.SerialException:
+                if self._serial.is_open:
+                    try:
+                        self._serial.write(CMD_EXIT)
+                        import time
+                        time.sleep(CMD_DELAY)
+                    except (serial.SerialException, OSError):
+                        pass
+                    try:
+                        self._serial.close()
+                    except (serial.SerialException, OSError):
+                        pass
+            except (serial.SerialException, OSError):
                 pass
+        self._serial = None
         self._connected = False
         self._device_info = None  # yeniden bağlanınca tam init yapılsın
         logger.info("GammaScout bağlantısı kapatıldı")
@@ -344,53 +362,63 @@ class GammaScoutReader:
         2. Online moda geç
         3. interval saniyede bir veri oku
         4. Callback ile bildir
+
+        Beklenmedik exception'lar yutulur (CancelledError hariç) — aksi halde
+        task ölür ve reboot olmadan reader bir daha çalışmaz.
         """
         self._running = True
         _consecutive_failures = 0
         while self._running:
-            if not self._connected:
-                logger.info("GammaScout'a bağlanılıyor...")
-                if not self.connect():
-                    await asyncio.sleep(5)
-                    continue
-                # Her bağlantıda cihazı tam init et (seri no + PC mode)
+            try:
+                if not self._connected:
+                    logger.info("GammaScout'a bağlanılıyor...")
+                    if not self.connect():
+                        await asyncio.sleep(5)
+                        continue
+                    # Her bağlantıda cihazı tam init et (seri no + PC mode)
+                    loop = asyncio.get_event_loop()
+                    self._device_info = await loop.run_in_executor(None, self._query_version)
+                    if self._device_info:
+                        logger.info("GammaScout FW:%s SN:%s", self._device_info.firmware, self._device_info.serial_number)
+                    if not self.enter_online_mode():
+                        self.disconnect()
+                        await asyncio.sleep(5)
+                        continue
+                    _consecutive_failures = 0
+
                 loop = asyncio.get_event_loop()
-                self._device_info = await loop.run_in_executor(None, self._query_version)
-                if self._device_info:
-                    logger.info("GammaScout FW:%s SN:%s", self._device_info.firmware, self._device_info.serial_number)
-                if not self.enter_online_mode():
-                    self.disconnect()
-                    await asyncio.sleep(5)
-                    continue
-                _consecutive_failures = 0
+                dose_rate = await loop.run_in_executor(None, self.read_once)
 
-            loop = asyncio.get_event_loop()
-            dose_rate = await loop.run_in_executor(None, self.read_once)
+                if dose_rate is not None:
+                    _consecutive_failures = 0
+                    dose_rate *= self.calibration_factor
+                    self._cumulative_dose += dose_rate * (interval / 3600)
+                    reading = Reading(
+                        timestamp=datetime.now(timezone.utc).isoformat(),
+                        dose_rate=dose_rate,
+                        cumulative_dose=round(self._cumulative_dose, 4),
+                    )
+                    if self._on_reading:
+                        try:
+                            await self._on_reading(reading)
+                        except Exception as e:
+                            logger.error("Reading callback hatası: %s", e)
+                else:
+                    _consecutive_failures += 1
+                    logger.debug("Okuma boş döndü (ardışık: %d/3)", _consecutive_failures)
+                    if not self._connected or _consecutive_failures >= 3:
+                        logger.warning("Okuma başarısız (%d), yeniden bağlanılıyor...", _consecutive_failures)
+                        self.disconnect()
+                        await asyncio.sleep(5)
+                        continue
 
-            if dose_rate is not None:
-                _consecutive_failures = 0
-                dose_rate *= self.calibration_factor
-                self._cumulative_dose += dose_rate * (interval / 3600)
-                reading = Reading(
-                    timestamp=datetime.now(timezone.utc).isoformat(),
-                    dose_rate=dose_rate,
-                    cumulative_dose=round(self._cumulative_dose, 4),
-                )
-                if self._on_reading:
-                    try:
-                        await self._on_reading(reading)
-                    except Exception as e:
-                        logger.error("Reading callback hatası: %s", e)
-            else:
-                _consecutive_failures += 1
-                logger.debug("Okuma boş döndü (ardışık: %d/3)", _consecutive_failures)
-                if not self._connected or _consecutive_failures >= 3:
-                    logger.warning("Okuma başarısız (%d), yeniden bağlanılıyor...", _consecutive_failures)
-                    self.disconnect()
-                    await asyncio.sleep(5)
-                    continue
-
-            await asyncio.sleep(interval)
+                await asyncio.sleep(interval)
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                logger.exception("Reader döngüsünde beklenmedik hata: %s", e)
+                self.disconnect()
+                await asyncio.sleep(5)
 
     def stop(self):
         """Okuma döngüsünü durdur."""

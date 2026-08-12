@@ -109,6 +109,78 @@ def test_disconnect(reader):
     assert reader.connected is False
 
 
+def test_disconnect_closes_even_if_write_fails(reader):
+    """USB cihaz fiziksel olarak çekildiğinde write OSError atar — close yine çağrılmalı
+    ve self._serial sıfırlanmalı, aksi halde stale fd reconnect'i bozar."""
+    import serial as pyserial
+    mock_ser = MagicMock()
+    mock_ser.is_open = True
+    mock_ser.write.side_effect = pyserial.SerialException("device disconnected")
+    reader._serial = mock_ser
+    reader._connected = True
+
+    reader.disconnect()
+
+    mock_ser.close.assert_called_once()
+    assert reader._serial is None
+    assert reader.connected is False
+    assert reader._device_info is None
+
+
+def test_disconnect_handles_raw_oserror(reader):
+    """pyserial bazı hataları ham OSError olarak da fırlatabilir — disconnect bunu da yutmalı."""
+    mock_ser = MagicMock()
+    mock_ser.is_open = True
+    mock_ser.write.side_effect = OSError("I/O error")
+    reader._serial = mock_ser
+    reader._connected = True
+
+    reader.disconnect()  # exception fırlatmamalı
+
+    assert reader._serial is None
+    assert reader.connected is False
+
+
+# --- reconnect: port path stale olduğunda ---
+
+def test_connect_rescans_vidpid_when_port_changed(reader):
+    """USB çıkarılıp tekrar takılınca tty numarası değişebilir.
+    Reconnect VID:PID ile gerçek cihaz portunu bulmalı, stale self.port'a takılmamalı."""
+    reader.port = "/dev/ttyUSB0"  # eski stale yol
+
+    fake_port = MagicMock()
+    fake_port.vid = 0x0403
+    fake_port.pid = 0xD678
+    fake_port.device = "/dev/ttyUSB1"  # cihaz yeni porta taşındı
+
+    with patch("app.serial_reader.list_ports.comports", return_value=[fake_port]), \
+         patch("serial.Serial") as mock_serial_cls:
+        mock_serial_cls.return_value = MagicMock()
+        assert reader.connect() is True
+
+    assert reader.port == "/dev/ttyUSB1"
+    # Serial gerçek (yeni) port ile açılmalı
+    call_kwargs = mock_serial_cls.call_args.kwargs
+    assert call_kwargs["port"] == "/dev/ttyUSB1"
+
+
+def test_read_once_handles_raw_oserror(reader):
+    """USB cihaz çekildiğinde pyserial bazen ham OSError atar — read_once bunu da yakalayıp
+    None döndürmeli ve self._connected'ı False yapmalı (aksi halde executor exception
+    asyncio loop'a sızar ve reader_task ölür)."""
+    mock_ser = MagicMock()
+    mock_ser.is_open = True
+    # in_waiting access OSError atabilir (zombie tty)
+    type(mock_ser).in_waiting = property(lambda _self: (_ for _ in ()).throw(OSError("EIO")))
+    reader._serial = mock_ser
+    reader._connected = True
+
+    result = reader.read_once()
+
+    assert result is None
+    assert reader.connected is False
+
+
 # --- read_once ---
 
 def test_read_once_returns_dose_rate(reader):
