@@ -13,3 +13,11 @@ build/
 .pytest_cache/
 docs/serial_probe_output.txt
 tools/
+
+# Cihaza özel çalışma ayarları (SMTP parolası içerir, repo public)
+mail_settings.json
+shifts_settings.json
+
+# npm artığı, projede Node bağımlılığı yok
+package.json
+package-lock.json
