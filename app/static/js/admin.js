@@ -91,6 +91,11 @@ async function saveSettings(msgEl) {
             msgEl.classList.add("show");
             setTimeout(() => msgEl.classList.remove("show"), 3000);
         }
+        // Pin ayarı değiştiyse röle kartı sunucuda yeniden kuruldu — göstergeyi tazele
+        if (res.ok && Object.keys(payload).some(k => k.startsWith("gpio_"))) {
+            refreshRelayPins();
+            refreshRelayState();
+        }
     } catch (e) {
         console.error("Ayarlar kaydedilemedi:", e);
     }
@@ -185,6 +190,29 @@ async function refreshRelayState() {
     } catch (e) { /* sessiz */ }
 }
 
+// Sürülen pin ile ayardaki pin ayrışırsa (pin açılamamışsa) uyar
+async function refreshRelayPins() {
+    const el = document.getElementById("relayPinStatus");
+    if (!el) return;
+    try {
+        const res = await fetch("/api/relay/pins");
+        if (!res.ok) return;
+        const pins = await res.json();
+        const bad = Object.entries(pins).filter(([, p]) => !p.ok);
+        if (bad.length) {
+            el.textContent = "Uyarı — pin açılamadı: " + bad
+                .map(([n, p]) => `${n}: ayar BCM${p.configured}, aktif ${p.live === null ? "yok" : "BCM" + p.live}`)
+                .join("; ");
+            el.style.color = "var(--red, #c0392b)";
+        } else {
+            el.textContent = "Aktif pinler: " + Object.entries(pins)
+                .map(([n, p]) => `${n}=BCM${p.live}`)
+                .join(", ");
+            el.style.color = "var(--text-dim)";
+        }
+    } catch (e) { /* sessiz */ }
+}
+
 async function relayToggle(btn) {
     const name = btn.dataset.name;
     const newOn = btn.dataset.on !== "true";
@@ -220,6 +248,7 @@ document.querySelectorAll(".relay-toggle-btn").forEach(btn => {
     btn.addEventListener("click", () => relayToggle(btn));
 });
 refreshRelayState();
+refreshRelayPins();
 
 // --- Test Email ---
 

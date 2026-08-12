@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, Request, Depends
 
 from app import msg_service, wifi
 from app.auth import verify_api_key, require_admin_or_apikey
+from app.relay import GPIO_PIN_KEYS, resolve_channels
 
 RELAY_CHANNELS = ("buzzer", "light", "emergency")
 
@@ -20,11 +21,20 @@ async def get_settings(request: Request):
 
 @router.put("/settings", dependencies=[Depends(require_admin_or_apikey)])
 async def update_settings(request: Request, settings: dict):
-    """Ayarları güncelle."""
+    """Ayarları güncelle.
+
+    GPIO pin ayarı değiştiyse röle kartını anında yeniden kur. Aksi halde süreç
+    başlangıçtaki pinleri sürmeye devam eder; API 200 döner ama röleler çekmez.
+    """
     config = request.app.state.config
     for key, value in settings.items():
         await config.set(key, str(value))
-    return {"status": "ok"}
+
+    relay_reloaded = False
+    if any(key in GPIO_PIN_KEYS.values() for key in settings):
+        relay = request.app.state.relay
+        relay_reloaded = relay.reconfigure(await resolve_channels(config))
+    return {"status": "ok", "relay_reloaded": relay_reloaded}
 
 
 @router.post("/test-email")
@@ -39,6 +49,26 @@ async def relay_state(request: Request):
     """Tüm röle kanallarının anlık durumunu döndür."""
     relay = request.app.state.relay
     return {name: relay.is_on(name) for name in RELAY_CHANNELS if relay.has(name)}
+
+
+@router.get("/relay/pins")
+async def relay_pins(request: Request):
+    """Kanal başına canlı (sürülen) ve yapılandırılmış pini karşılaştır.
+
+    İkisi ayrışıyorsa pin açılamamış demektir (ör. başka süreç tutuyor) — panel
+    bunu uyarı olarak gösterir.
+    """
+    relay = request.app.state.relay
+    live = relay.pins()
+    configured = await resolve_channels(request.app.state.config)
+    return {
+        name: {
+            "live": live.get(name),
+            "configured": configured.get(name),
+            "ok": live.get(name) == configured.get(name),
+        }
+        for name in RELAY_CHANNELS
+    }
 
 
 @router.post("/relay/test", dependencies=[Depends(require_admin_or_apikey)])

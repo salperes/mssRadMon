@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from app.alarm import AlarmManager
-from app.relay import RelayBoard
+from app.relay import RelayBoard, resolve_channels
 from app.auth import (
     _hash_password,
     _sign_cookie,
@@ -71,12 +71,7 @@ def create_app() -> FastAPI:
 
         # Waveshare RPi Relay Board (3 kanal, active-low)
         # CH1=BCM26, CH2=BCM20, CH3=BCM21 (DB'de override edilebilir)
-        relay_channels = {
-            "buzzer": int(await config.get("gpio_buzzer_pin") or "26"),
-            "light": int(await config.get("gpio_light_pin") or "20"),
-            "emergency": int(await config.get("gpio_emergency_pin") or "21"),
-        }
-        relay = RelayBoard(relay_channels)
+        relay = RelayBoard(await resolve_channels(config))
 
         alarm_manager = AlarmManager(db=db, config=config, relay=relay)
         await alarm_manager.init()

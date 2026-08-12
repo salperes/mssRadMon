@@ -23,9 +23,10 @@ DEFAULTS: dict[str, str] = {
     "remote_log_enabled": "false",
     "remote_log_url": "",
     "remote_log_api_key": "",
-    "gpio_buzzer_pin": "17",
-    "gpio_light_pin": "27",
-    "gpio_emergency_pin": "22",
+    # Waveshare RPi Relay Board CH1/CH2/CH3 (active-low)
+    "gpio_buzzer_pin": "26",
+    "gpio_light_pin": "20",
+    "gpio_emergency_pin": "21",
     "alarm_high_actions": "buzzer,light",
     "alarm_high_high_actions": "buzzer,light,emergency",
     "msg_service_url": "http://192.168.88.112:3501",
