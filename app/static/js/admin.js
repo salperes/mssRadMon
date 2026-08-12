@@ -153,6 +153,74 @@ document.getElementById("newEmailAddr").addEventListener("keydown", (e) => {
     if (e.key === "Enter") { e.preventDefault(); document.getElementById("addEmailBtn").click(); }
 });
 
+// --- Röle Manuel Test (toggle) ---
+
+function applyRelayUI(name, on) {
+    const row = document.querySelector(`.relay-test-row[data-name="${name}"]`);
+    if (!row) return;
+    const dot = row.querySelector(".relay-dot");
+    const btn = row.querySelector(".relay-toggle-btn");
+    if (dot) dot.style.background = on ? "var(--green)" : "var(--text-dim)";
+    if (btn) {
+        btn.dataset.on = on ? "true" : "false";
+        btn.textContent = on ? "Bırak" : "Çek";
+        if (on) {
+            btn.style.background = "var(--accent)";
+            btn.style.color = "#fff";
+            btn.style.border = "1px solid var(--accent)";
+        } else {
+            btn.style.background = "var(--surface)";
+            btn.style.color = "var(--text)";
+            btn.style.border = "1px solid rgba(0,0,0,0.15)";
+        }
+    }
+}
+
+async function refreshRelayState() {
+    try {
+        const res = await fetch("/api/relay/state");
+        if (!res.ok) return;
+        const state = await res.json();
+        for (const [name, on] of Object.entries(state)) applyRelayUI(name, on);
+    } catch (e) { /* sessiz */ }
+}
+
+async function relayToggle(btn) {
+    const name = btn.dataset.name;
+    const newOn = btn.dataset.on !== "true";
+    const msgEl = document.getElementById("relayTestMsg");
+    msgEl.textContent = "Gönderiliyor...";
+    msgEl.style.color = "var(--text-dim)";
+    btn.disabled = true;
+    try {
+        const res = await fetch("/api/relay/test", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name, on: newOn }),
+        });
+        const data = await res.json();
+        if (res.ok && data.ok) {
+            applyRelayUI(name, data.on);
+            msgEl.textContent = `${name}: ${data.on ? "ÇEKİLDİ" : "BIRAKILDI"}`;
+            msgEl.style.color = "var(--green)";
+        } else {
+            msgEl.textContent = data.detail || "Hata";
+            msgEl.style.color = "var(--red)";
+            refreshRelayState();
+        }
+    } catch (e) {
+        msgEl.textContent = "İstek hatası";
+        msgEl.style.color = "var(--red)";
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+document.querySelectorAll(".relay-toggle-btn").forEach(btn => {
+    btn.addEventListener("click", () => relayToggle(btn));
+});
+refreshRelayState();
+
 // --- Test Email ---
 
 document.getElementById("testEmailBtn").addEventListener("click", async () => {

@@ -8,7 +8,7 @@ GammaScout radyasyon dedektöründen seri port üzerinden anlık doz hızı (µS
 - **Veritabanı:** SQLite (aiosqlite), `data/readings.db`
 - **Frontend:** Vanilla JS, Chart.js, Bootstrap 5 (CDN yok, static/lib altında)
 - **Cihaz iletişimi:** pyserial ile `/dev/ttyUSB0` (FTDI USB-Serial)
-- **Donanım:** Raspberry Pi, GPIO üzerinden buzzer/ışık/acil durum çıkışları (gpiozero)
+- **Donanım:** Raspberry Pi, Waveshare 3-kanal RPi Relay Board (active-low, BCM26/20/21) üzerinden buzzer/ışık/acil durum çıkışları (gpiozero + lgpio)
 
 ## Proje Yapısı
 
@@ -18,7 +18,8 @@ app/
   config.py        # SQLite settings tablosu üzerinden ayar yönetimi
   db.py            # aiosqlite veritabanı katmanı
   serial_reader.py # GammaScout seri port okuyucu
-  alarm.py         # Alarm yönetimi (eşik, süre, buzzer, ışık)
+  alarm.py         # Alarm yönetimi (eşik, süre, röle aksiyonları)
+  relay.py         # Waveshare 3-kanal röle kartı sürücüsü (active-low)
   shift.py         # Vardiya yönetimi ve doz takibi
   remote_log.py    # Uzak sunucuya log iletimi
   wifi.py          # WiFi otomatik bağlantı ve alarm durumunda AP geçişi

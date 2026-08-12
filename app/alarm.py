@@ -1,7 +1,8 @@
-"""Alarm yonetimi — esik kontrolu, GPIO cikislari, e-posta."""
+"""Alarm yonetimi — esik kontrolu, role cikislari, e-posta."""
 import asyncio
 import logging
 from app import msg_service
+from app.relay import RelayBoard
 import smtplib
 from datetime import datetime, timezone
 from email.message import EmailMessage
@@ -15,17 +16,6 @@ def _local_time() -> str:
     """Lokal zaman: HH:MM - DD/MM/YYYY"""
     return datetime.now().strftime("%H:%M - %d/%m/%Y")
 
-try:
-    from gpiozero import OutputDevice
-except ImportError:
-    # GPIO olmayan ortamda (test, gelistirme) mock
-    class OutputDevice:
-        def __init__(self, pin, **kwargs):
-            self.pin = pin
-        def on(self): pass
-        def off(self): pass
-        def close(self): pass
-
 
 class AlarmLevel(Enum):
     HIGH = "high"
@@ -34,11 +24,11 @@ class AlarmLevel(Enum):
 
 
 class AlarmManager:
-    def __init__(self, db, config):
+    def __init__(self, db, config, relay: RelayBoard):
         self._db = db
         self._config = config
+        self._relay = relay
         self._active_level: AlarmLevel | None = None
-        self._gpio_devices: dict[str, OutputDevice] = {}
         self._buzzer_task: asyncio.Task | None = None
         self._exceed_start: float | None = None
         self._exceed_level: AlarmLevel | None = None
@@ -47,19 +37,8 @@ class AlarmManager:
         self._silenced: bool = False
 
     async def init(self):
-        """GPIO cihazlarini baslat."""
-        pin_keys = {
-            "buzzer": "gpio_buzzer_pin",
-            "light": "gpio_light_pin",
-            "emergency": "gpio_emergency_pin",
-        }
-        for name, key in pin_keys.items():
-            pin = await self._config.get(key)
-            if pin:
-                try:
-                    self._gpio_devices[name] = OutputDevice(int(pin), initial_value=False)
-                except Exception as e:
-                    logger.warning("GPIO %s (pin %s) başlatılamadı: %s", name, pin, e)
+        """Backward-compat: artık iş yok, röle init main.py'de yapılıyor."""
+        return
 
     async def check(self, dose_rate: float) -> AlarmLevel | None:
         """Doz hizini kontrol et. Sure dolunca alarm tetikle."""
@@ -143,11 +122,10 @@ class AlarmManager:
         if level == AlarmLevel.CRITICAL:
             actions = ["buzzer", "light", "emergency"]
 
-        # Silence flag aktifse GPIO cikislarini etkinlestirme
+        # Silence flag aktifse role cikislarini etkinlestirme
         if not self._silenced:
             for action in actions:
-                if action in self._gpio_devices:
-                    self._gpio_devices[action].on()
+                self._relay.set(action, True)
 
             if "buzzer" in actions:
                 if self._buzzer_task:
@@ -188,7 +166,7 @@ class AlarmManager:
         )
 
     async def _clear_alarm(self):
-        """Aktif alarmi temizle, GPIO'lari kapat."""
+        """Aktif alarmi temizle, roleleri birak."""
         # Kapanmadan once son exceed_duration'i kaydet
         if self._alarm_exceed_start_mono is not None and self._active_alarm_id:
             final_elapsed = time.monotonic() - self._alarm_exceed_start_mono
@@ -198,15 +176,14 @@ class AlarmManager:
         if self._buzzer_task:
             self._buzzer_task.cancel()
             self._buzzer_task = None
-        for device in self._gpio_devices.values():
-            device.off()
+        self._relay.all_off()
         logger.info("Alarm temizlendi (onceki seviye: %s)", self._active_level)
         self._active_level = None
         self._active_alarm_id = None
         self._silenced = False
 
     async def silence_outputs(self) -> dict:
-        """Aktif alarm event icin GPIO ciksilarini OFF. Idempotent."""
+        """Aktif alarm event icin role ciksilarini OFF. Idempotent."""
         if self._active_level is None:
             return {"silenced": False, "event_id": None}
 
@@ -214,25 +191,23 @@ class AlarmManager:
         if self._buzzer_task:
             self._buzzer_task.cancel()
             self._buzzer_task = None
-        for device in self._gpio_devices.values():
-            device.off()
+        self._relay.all_off()
 
         logger.info("Alarm cikislari operator tarafindan susturuldu (event_id=%s)", self._active_alarm_id)
         return {"silenced": True, "event_id": self._active_alarm_id}
 
     async def _buzzer_pattern_high(self):
         """High alarm buzzer pattern: 1s acik, 5s kapali."""
-        buzzer = self._gpio_devices.get("buzzer")
-        if not buzzer:
+        if not self._relay.has("buzzer"):
             return
         try:
             while True:
-                buzzer.on()
+                self._relay.set("buzzer", True)
                 await asyncio.sleep(1)
-                buzzer.off()
+                self._relay.set("buzzer", False)
                 await asyncio.sleep(5)
         except asyncio.CancelledError:
-            buzzer.off()
+            self._relay.set("buzzer", False)
 
     async def _send_email(self, level: AlarmLevel, dose_rate: float):
         """SMTP ile alarm e-postasi gonder."""
@@ -382,9 +357,7 @@ class AlarmManager:
         )
 
     def shutdown(self):
-        """GPIO'lari kapat."""
+        """Buzzer pattern'i durdur. Role kapatma main.py lifespan'inde."""
         if self._buzzer_task:
             self._buzzer_task.cancel()
-        for device in self._gpio_devices.values():
-            device.off()
-            device.close()
+        self._relay.all_off()
