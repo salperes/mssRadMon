@@ -1,4 +1,19 @@
 ---------------------------------------------------------
+Rev. ID    : 3
+Version    : 1.4.4
+Rev. Date  : 26.09.2026
+Rev. Time  : 19:55:00
+Rev. Prompt: Tüm alarmlar radMonManager üzerinden WA/mail ile iletilsin; cihaz alarm oluştuğunda WS ile manager'a bildirsin; cihazın kendi alarm mesajları ayarla seçilebilsin.
+
+Rev. Report: (
+- app/alarm.py: AlarmManager.on_alarm callback — alarm tetiklenince (alarm_log kaydından sonra) {type:"alarm", level, dose_rate, timestamp, action_taken} ile çağrılır; timestamp alarm_log ile aynıdır (manager (device_id,timestamp) ile dedup eder). Callback hatası alarmı/röleleri etkilemez.
+- app/alarm.py: cihazın kendi alarm mesajları (SMTP e-posta, msgService mail/WA) yeni alarm_device_notify_enabled ayarına bağlandı; kapalıyken hiçbiri gönderilmez. Alt ayarlar/alıcılar korunur. WiFi IP e-postası etkilenmez.
+- app/config.py: alarm_device_notify_enabled varsayılan "false" — bildirimleri radMonManager (>= 1.0.50) gönderir.
+- app/main.py: broadcast_alarm — on_alarm'ı bağlı WS istemcilerine yayınlar. Dashboard yalnızca type=="reading" işlediği için etkilenmez.
+- tests/test_alarm.py: varsayılan kapalı, açıkken gönderim, on_alarm payload'ı, callback hatasında alarmın sürmesi testleri.
+)
+
+---------------------------------------------------------
 Rev. ID    : 2
 Version    : 1.4.3
 Rev. Date  : 12.08.2026

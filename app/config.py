@@ -15,6 +15,8 @@ DEFAULTS: dict[str, str] = {
     "alarm_critical_actions": "buzzer,light,emergency",
     "alarm_buzzer_enabled": "true",
     "alarm_email_enabled": "false",
+    # false: alarm mesajlarını (SMTP/msgService mail/WA) cihaz göndermez, radMonManager gönderir
+    "alarm_device_notify_enabled": "false",
     "alarm_email_to": "",
     "smtp_host": "",
     "smtp_port": "587",

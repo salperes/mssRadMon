@@ -35,6 +35,8 @@ class AlarmManager:
         self._alarm_exceed_start_mono: float | None = None  # alarm tetiklendiğindeki exceed_start
         self._active_alarm_id: int | None = None
         self._silenced: bool = False
+        # Alarm tetiklenince çağrılır (main.py WS yayını bağlar): async (event: dict) -> None
+        self.on_alarm = None
 
     async def init(self):
         """Backward-compat: artık iş yok, röle init main.py'de yapılıyor."""
@@ -142,14 +144,27 @@ class AlarmManager:
             (timestamp, level.value, dose_rate, action_taken, round(exceed_duration)),
         )
 
-        # E-posta gonder
-        email_enabled = await self._config.get("alarm_email_enabled")
-        if email_enabled == "true":
-            await self._send_email(level, dose_rate)
+        # Manager'a (WS) anında bildir — timestamp alarm_log ile aynı (manager dedup)
+        if self.on_alarm:
+            try:
+                await self.on_alarm({
+                    "type": "alarm",
+                    "level": level.value,
+                    "dose_rate": dose_rate,
+                    "timestamp": timestamp,
+                    "action_taken": action_taken,
+                })
+            except Exception as e:
+                logger.error("on_alarm callback hatasi: %s", e)
 
-        # msgService bildirimleri
-        await self._send_msgservice_mail(level, dose_rate)
-        await self._send_msgservice_wa(level, dose_rate)
+        # Cihazın kendi alarm mesajları (varsayılan kapalı — bildirimleri radMonManager gönderir)
+        if await self._config.get("alarm_device_notify_enabled") == "true":
+            email_enabled = await self._config.get("alarm_email_enabled")
+            if email_enabled == "true":
+                await self._send_email(level, dose_rate)
+
+            await self._send_msgservice_mail(level, dose_rate)
+            await self._send_msgservice_wa(level, dose_rate)
 
         # Alarm temizlendiğinde toplam süreyi hesaplamak için exceed_start'ı sakla
         self._alarm_exceed_start_mono = self._exceed_start

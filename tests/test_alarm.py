@@ -93,3 +93,62 @@ async def test_relay_set_on_trigger(alarm_manager):
     assert "buzzer" in names_called
     assert "light" in names_called
     assert "emergency" not in names_called  # high actions'da yok
+
+
+def _mock_notifiers(manager):
+    manager._send_email = AsyncMock()
+    manager._send_msgservice_mail = AsyncMock()
+    manager._send_msgservice_wa = AsyncMock()
+
+
+@pytest.mark.asyncio
+async def test_device_notify_disabled_by_default(alarm_manager):
+    """alarm_device_notify_enabled tanımsız/false → cihaz alarm mesajı göndermez."""
+    _mock_notifiers(alarm_manager)
+    await _trigger(alarm_manager, 1.5)
+    alarm_manager._send_email.assert_not_called()
+    alarm_manager._send_msgservice_mail.assert_not_called()
+    alarm_manager._send_msgservice_wa.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_device_notify_enabled(alarm_manager):
+    """alarm_device_notify_enabled=true → msgService gönderimleri çalışır."""
+    base_get = alarm_manager._config.get.side_effect
+    alarm_manager._config.get.side_effect = (
+        lambda k: "true" if k in ("alarm_device_notify_enabled", "alarm_email_enabled") else base_get(k)
+    )
+    _mock_notifiers(alarm_manager)
+    await _trigger(alarm_manager, 1.5)
+    alarm_manager._send_email.assert_awaited_once()
+    alarm_manager._send_msgservice_mail.assert_awaited_once()
+    alarm_manager._send_msgservice_wa.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_on_alarm_callback(alarm_manager):
+    """Alarm tetiklenince on_alarm callback'i alarm bilgisiyle çağrılır."""
+    received = []
+
+    async def on_alarm(event):
+        received.append(event)
+
+    alarm_manager.on_alarm = on_alarm
+    await _trigger(alarm_manager, 1.5)
+    assert len(received) == 1
+    ev = received[0]
+    assert ev["type"] == "alarm"
+    assert ev["level"] == "high_high"
+    assert ev["dose_rate"] == 1.5
+    assert isinstance(ev["timestamp"], str) and ev["timestamp"].endswith("+00:00")
+
+
+@pytest.mark.asyncio
+async def test_on_alarm_callback_error_does_not_break_alarm(alarm_manager):
+    """Callback hata verse de alarm tetiklenir (röle/DB etkilenmez)."""
+    async def boom(event):
+        raise RuntimeError("ws down")
+
+    alarm_manager.on_alarm = boom
+    level = await _trigger(alarm_manager, 1.5)
+    assert level == AlarmLevel.HIGH_HIGH

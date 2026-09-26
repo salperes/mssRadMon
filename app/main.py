@@ -148,6 +148,16 @@ def create_app() -> FastAPI:
 
         reader.on_reading(on_reading)
 
+        async def broadcast_alarm(event: dict):
+            """Alarm tetiklenince bağlı WS istemcilerine (radMonManager) anında bildir."""
+            for client in list(app.state.ws_clients):
+                try:
+                    await client.send_json(event)
+                except Exception:
+                    app.state.ws_clients.discard(client)
+
+        alarm_manager.on_alarm = broadcast_alarm
+
         async def heartbeat_loop(period: int = 20):
             """Okuma akışından bağımsız periyodik durum frame'i gönder.
 
